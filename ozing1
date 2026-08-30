@@ -252,17 +252,17 @@ local function showKeyUI(onValid)
             end
 
             local messages = {
-                invalid_key = "Clé invalide.",
-                missing_key = "Clé manquante.",
-                hwid_mismatch = "Clé utilisée sur un autre appareil.",
-                expired = "Votre clé a expiré ou Blacklisté.",
-                server_error = "Erreur serveur. Réessayez."
-            }
+    invalid_key = "Clé invalide, expirée ou blacklistée.",
+    missing_key = "Clé manquante.",
+    hwid_mismatch = "Clé utilisée sur un autre appareil.",
+    expired = "Clé expirée ou blacklistée.",
+    server_error = "Erreur serveur. Réessayez."
+}
 
-            setStatus(
-                messages[reason] or "Clé invalide ou Blacklisté.",
-                false
-            )
+setStatus(
+    messages[reason] or "Clé invalide, expirée ou blacklistée.",
+    false
+)
 
             button.Text = "Valider la clé"
             checking = false
