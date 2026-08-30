@@ -1,3 +1,4 @@
+```lua
 -- CloverHub — Key System Loader
 
 local VALIDATE_URL =
@@ -5,6 +6,9 @@ local VALIDATE_URL =
 
 local MAIN_SCRIPT =
     "https://raw.githubusercontent.com/Ryuun0x/Clover/refs/heads/main/main.lua"
+
+local DISCORD_URL =
+    "https://discord.gg/hXTNQZSSKP"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -84,6 +88,42 @@ local function validateKey(key)
     return data.valid == true, data.reason
 end
 
+-- Ouvrir Discord
+local function openDiscord()
+    -- Copier le lien dans le presse-papier si disponible
+    if setclipboard then
+        pcall(function()
+            setclipboard(DISCORD_URL)
+        end)
+    elseif toclipboard then
+        pcall(function()
+            toclipboard(DISCORD_URL)
+        end)
+    end
+
+    -- Tentative d'ouverture directe
+    local success = false
+
+    pcall(function()
+        if syn and syn.open_url then
+            syn.open_url(DISCORD_URL)
+            success = true
+        end
+    end)
+
+    if not success then
+        pcall(function()
+            if open_url then
+                open_url(DISCORD_URL)
+                success = true
+            end
+        end)
+    end
+
+    -- Si l'exécuteur ne permet pas l'ouverture directe,
+    -- le lien reste copié dans le presse-papier.
+end
+
 -- UI
 local function showKeyUI(onValid)
     local gui = Instance.new("ScreenGui")
@@ -103,7 +143,7 @@ local function showKeyUI(onValid)
     local card = Instance.new("Frame")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(380, 300)
+    card.Size = UDim2.fromOffset(380, 320)
     card.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
     card.BorderSizePixel = 0
     card.Parent = background
@@ -144,28 +184,18 @@ local function showKeyUI(onValid)
     box.Name = "KeyInput"
     box.Position = UDim2.fromOffset(30, 94)
     box.Size = UDim2.fromOffset(320, 44)
-
     box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     box.BorderSizePixel = 0
-
     box.TextColor3 = Color3.fromRGB(235, 240, 245)
     box.Font = Enum.Font.Gotham
     box.TextSize = 14
-
-    -- IMPORTANT :
-    -- La TextBox est complètement vide au lancement.
     box.Text = ""
-
-    -- Le texte affiché quand elle est vide est seulement un placeholder.
     box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
     box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
-
     box.ClearTextOnFocus = false
     box.MultiLine = false
-
     box.TextXAlignment = Enum.TextXAlignment.Left
     box.TextYAlignment = Enum.TextYAlignment.Center
-
     box.Parent = card
 
     local boxCorner = Instance.new("UICorner")
@@ -177,10 +207,36 @@ local function showKeyUI(onValid)
     padding.PaddingRight = UDim.new(0, 14)
     padding.Parent = box
 
+    -- Discord Button
+    local discordButton = Instance.new("TextButton")
+    discordButton.Name = "DiscordButton"
+    discordButton.Position = UDim2.fromOffset(30, 148)
+    discordButton.Size = UDim2.fromOffset(320, 32)
+    discordButton.BackgroundTransparency = 1
+    discordButton.BorderSizePixel = 0
+    discordButton.Font = Enum.Font.Gotham
+    discordButton.TextSize = 12
+    discordButton.TextColor3 = Color3.fromRGB(130, 170, 220)
+    discordButton.Text = "Rejoindre le Discord"
+    discordButton.AutoButtonColor = false
+    discordButton.Parent = card
+
+    discordButton.MouseEnter:Connect(function()
+        discordButton.TextColor3 = Color3.fromRGB(170, 200, 245)
+    end)
+
+    discordButton.MouseLeave:Connect(function()
+        discordButton.TextColor3 = Color3.fromRGB(130, 170, 220)
+    end)
+
+    discordButton.MouseButton1Click:Connect(function()
+        openDiscord()
+    end)
+
     -- Status
     local status = Instance.new("TextLabel")
     status.BackgroundTransparency = 1
-    status.Position = UDim2.fromOffset(30, 148)
+    status.Position = UDim2.fromOffset(30, 177)
     status.Size = UDim2.fromOffset(320, 22)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
@@ -190,7 +246,7 @@ local function showKeyUI(onValid)
 
     -- Button
     local button = Instance.new("TextButton")
-    button.Position = UDim2.fromOffset(30, 184)
+    button.Position = UDim2.fromOffset(30, 207)
     button.Size = UDim2.fromOffset(320, 44)
     button.BackgroundColor3 = Color3.fromRGB(45, 200, 130)
     button.BorderSizePixel = 0
@@ -252,17 +308,18 @@ local function showKeyUI(onValid)
             end
 
             local messages = {
-    invalid_key = "Clé invalide, expirée ou blacklistée.",
-    missing_key = "Clé manquante.",
-    hwid_mismatch = "Clé utilisée sur un autre appareil.",
-    expired = "Clé expirée ou blacklistée.",
-    server_error = "Erreur serveur. Réessayez."
-}
+                invalid_key = "Clé invalide, expirée ou blacklistée.",
+                missing_key = "Clé manquante.",
+                hwid_mismatch = "Clé utilisée sur un autre appareil.",
+                expired = "Clé expirée ou blacklistée.",
+                server_error = "Erreur serveur. Réessayez."
+            }
 
-setStatus(
-    messages[reason] or "Clé invalide, expirée ou blacklistée.",
-    false
-)
+            setStatus(
+                messages[reason]
+                    or "Clé invalide, expirée ou blacklistée.",
+                false
+            )
 
             button.Text = "Valider la clé"
             checking = false
@@ -279,7 +336,7 @@ setStatus(
         end
     end)
 
-    -- Auto-focus sur la case de clé
+    -- Auto-focus
     task.defer(function()
         box:CaptureFocus()
     end)
@@ -295,3 +352,4 @@ showKeyUI(function()
         warn("[Clover] Erreur : " .. tostring(err))
     end
 end)
+```
