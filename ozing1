@@ -1,4 +1,3 @@
-```lua
 -- CloverHub — Key System Loader
 
 local VALIDATE_URL =
@@ -87,26 +86,13 @@ end
 
 -- UI
 local function showKeyUI(onValid)
-
-    -- Supprime une ancienne interface si elle existe
-    local parent = (gethui and gethui()) or game:GetService("CoreGui")
-
-    pcall(function()
-        local oldGui = parent:FindFirstChild("CloverKeySystem")
-
-        if oldGui then
-            oldGui:Destroy()
-        end
-    end)
-
     local gui = Instance.new("ScreenGui")
     gui.Name = "CloverKeySystem"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = parent
+    gui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
-    -- Background
     local background = Instance.new("Frame")
     background.Size = UDim2.fromScale(1, 1)
     background.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
@@ -114,7 +100,6 @@ local function showKeyUI(onValid)
     background.BorderSizePixel = 0
     background.Parent = gui
 
-    -- Card
     local card = Instance.new("Frame")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.5)
@@ -132,59 +117,48 @@ local function showKeyUI(onValid)
     stroke.Thickness = 1
     stroke.Parent = card
 
-    -- Discord en haut
-    local discordText = Instance.new("TextLabel")
-    discordText.Name = "DiscordText"
-    discordText.BackgroundTransparency = 1
-    discordText.Position = UDim2.fromOffset(0, 5)
-    discordText.Size = UDim2.new(1, 0, 0, 20)
-    discordText.Font = Enum.Font.GothamSemibold
-    discordText.TextSize = 12
-    discordText.TextColor3 = Color3.fromRGB(130, 170, 220)
-    discordText.Text = "Discord : discord.gg/hXTNQZSSKP"
-    discordText.TextXAlignment = Enum.TextXAlignment.Center
-    discordText.Parent = card
-
     -- Title
     local title = Instance.new("TextLabel")
     title.BackgroundTransparency = 1
-    title.Position = UDim2.fromOffset(0, 30)
+    title.Position = UDim2.fromOffset(0, 24)
     title.Size = UDim2.new(1, 0, 0, 30)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 20
     title.TextColor3 = Color3.fromRGB(235, 240, 245)
     title.Text = "Clover — Clé d'accès"
-    title.TextXAlignment = Enum.TextXAlignment.Center
     title.Parent = card
 
     -- Subtitle
     local subtitle = Instance.new("TextLabel")
     subtitle.BackgroundTransparency = 1
-    subtitle.Position = UDim2.fromOffset(0, 62)
+    subtitle.Position = UDim2.fromOffset(0, 56)
     subtitle.Size = UDim2.new(1, 0, 0, 18)
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 12
     subtitle.TextColor3 = Color3.fromRGB(140, 150, 160)
     subtitle.Text = "Entrez votre clé pour continuer"
-    subtitle.TextXAlignment = Enum.TextXAlignment.Center
     subtitle.Parent = card
 
     -- Key TextBox
     local box = Instance.new("TextBox")
     box.Name = "KeyInput"
-    box.Position = UDim2.fromOffset(30, 100)
+    box.Position = UDim2.fromOffset(30, 94)
     box.Size = UDim2.fromOffset(320, 44)
 
     box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     box.BorderSizePixel = 0
 
-    box.Text = ""
-    box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
-    box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
-
     box.TextColor3 = Color3.fromRGB(235, 240, 245)
     box.Font = Enum.Font.Gotham
     box.TextSize = 14
+
+    -- IMPORTANT :
+    -- La TextBox est complètement vide au lancement.
+    box.Text = ""
+
+    -- Le texte affiché quand elle est vide est seulement un placeholder.
+    box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
+    box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
 
     box.ClearTextOnFocus = false
     box.MultiLine = false
@@ -205,9 +179,8 @@ local function showKeyUI(onValid)
 
     -- Status
     local status = Instance.new("TextLabel")
-    status.Name = "Status"
     status.BackgroundTransparency = 1
-    status.Position = UDim2.fromOffset(30, 152)
+    status.Position = UDim2.fromOffset(30, 148)
     status.Size = UDim2.fromOffset(320, 22)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
@@ -217,18 +190,14 @@ local function showKeyUI(onValid)
 
     -- Button
     local button = Instance.new("TextButton")
-    button.Name = "ValidateButton"
     button.Position = UDim2.fromOffset(30, 184)
     button.Size = UDim2.fromOffset(320, 44)
-
     button.BackgroundColor3 = Color3.fromRGB(45, 200, 130)
     button.BorderSizePixel = 0
-
     button.TextColor3 = Color3.fromRGB(255, 255, 255)
     button.Font = Enum.Font.GothamSemibold
     button.TextSize = 15
     button.Text = "Valider la clé"
-
     button.Parent = card
 
     local buttonCorner = Instance.new("UICorner")
@@ -239,7 +208,6 @@ local function showKeyUI(onValid)
 
     -- Status message
     local function setStatus(message, success)
-
         status.Text = message
 
         if success then
@@ -251,7 +219,6 @@ local function showKeyUI(onValid)
 
     -- Validate key
     local function tryValidate()
-
         if checking then
             return
         end
@@ -259,25 +226,18 @@ local function showKeyUI(onValid)
         local key = box.Text:gsub("%s+", "")
 
         if key == "" then
-            setStatus(
-                "Veuillez entrer une clé.",
-                false
-            )
+            setStatus("Veuillez entrer une clé.", false)
             return
         end
 
         checking = true
-
         button.Text = "Vérification..."
-
         setStatus("", false)
 
         task.spawn(function()
-
             local valid, reason = validateKey(key)
 
             if valid then
-
                 setStatus(
                     "Clé valide ! Chargement de Clover...",
                     true
@@ -288,52 +248,38 @@ local function showKeyUI(onValid)
                 gui:Destroy()
 
                 onValid()
-
                 return
             end
 
             local messages = {
-                invalid_key =
-                    "Clé invalide, expirée ou blacklistée.",
-
-                missing_key =
-                    "Clé manquante.",
-
-                hwid_mismatch =
-                    "Clé utilisée sur un autre appareil.",
-
-                expired =
-                    "Clé expirée ou blacklistée.",
-
-                server_error =
-                    "Erreur serveur. Réessayez."
+                invalid_key = "Clé invalide.",
+                missing_key = "Clé manquante.",
+                hwid_mismatch = "Clé utilisée sur un autre appareil.",
+                expired = "Votre clé a expiré.",
+                server_error = "Erreur serveur. Réessayez."
             }
 
             setStatus(
-                messages[reason]
-                    or "Clé invalide, expirée ou blacklistée.",
+                messages[reason] or "Clé invalide.",
                 false
             )
 
             button.Text = "Valider la clé"
-
             checking = false
         end)
     end
 
-    -- Click
+    -- Button
     button.MouseButton1Click:Connect(tryValidate)
 
-    -- Enter
+    -- Enter key
     box.FocusLost:Connect(function(enterPressed)
-
         if enterPressed then
             tryValidate()
         end
-
     end)
 
-    -- Focus automatique
+    -- Auto-focus sur la case de clé
     task.defer(function()
         box:CaptureFocus()
     end)
@@ -341,22 +287,11 @@ end
 
 -- Chargement de Clover
 showKeyUI(function()
-
     local ok, err = pcall(function()
-
-        loadstring(
-            game:HttpGet(MAIN_SCRIPT)
-        )()
-
+        loadstring(game:HttpGet(MAIN_SCRIPT))()
     end)
 
     if not ok then
-
-        warn(
-            "[Clover] Erreur : "
-            .. tostring(err)
-        )
-
+        warn("[Clover] Erreur : " .. tostring(err))
     end
 end)
-```
