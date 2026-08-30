@@ -1,4 +1,3 @@
-```lua
 -- CloverHub — Key System Loader
 
 local VALIDATE_URL =
@@ -127,7 +126,6 @@ local function showKeyUI(onValid)
     title.TextSize = 20
     title.TextColor3 = Color3.fromRGB(235, 240, 245)
     title.Text = "Clover — Clé d'accès"
-    title.TextXAlignment = Enum.TextXAlignment.Center
     title.Parent = card
 
     -- Subtitle
@@ -139,7 +137,6 @@ local function showKeyUI(onValid)
     subtitle.TextSize = 12
     subtitle.TextColor3 = Color3.fromRGB(140, 150, 160)
     subtitle.Text = "Entrez votre clé pour continuer"
-    subtitle.TextXAlignment = Enum.TextXAlignment.Center
     subtitle.Parent = card
 
     -- Key TextBox
@@ -151,20 +148,20 @@ local function showKeyUI(onValid)
     box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     box.BorderSizePixel = 0
 
+    box.TextColor3 = Color3.fromRGB(235, 240, 245)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 14
+
     -- IMPORTANT :
-    -- Le champ est réellement vide au lancement.
+    -- La TextBox est complètement vide au lancement.
     box.Text = ""
 
-    -- Ceci est uniquement le texte d'indication.
+    -- Le texte affiché quand elle est vide est seulement un placeholder.
     box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
     box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
 
     box.ClearTextOnFocus = false
     box.MultiLine = false
-
-    box.TextColor3 = Color3.fromRGB(235, 240, 245)
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 14
 
     box.TextXAlignment = Enum.TextXAlignment.Left
     box.TextYAlignment = Enum.TextYAlignment.Center
@@ -255,16 +252,15 @@ local function showKeyUI(onValid)
             end
 
             local messages = {
-                invalid_key = "Clé invalide, expirée ou blacklistée.",
+                invalid_key = "Clé invalide.",
                 missing_key = "Clé manquante.",
                 hwid_mismatch = "Clé utilisée sur un autre appareil.",
-                expired = "Clé expirée ou blacklistée.",
+                expired = "Votre clé a expiré.",
                 server_error = "Erreur serveur. Réessayez."
             }
 
             setStatus(
-                messages[reason] or
-                "Clé invalide, expirée ou blacklistée.",
+                messages[reason] or "Clé invalide.",
                 false
             )
 
@@ -276,14 +272,14 @@ local function showKeyUI(onValid)
     -- Button
     button.MouseButton1Click:Connect(tryValidate)
 
-    -- Enter
+    -- Enter key
     box.FocusLost:Connect(function(enterPressed)
         if enterPressed then
             tryValidate()
         end
     end)
 
-    -- Auto-focus
+    -- Auto-focus sur la case de clé
     task.defer(function()
         box:CaptureFocus()
     end)
@@ -299,4 +295,3 @@ showKeyUI(function()
         warn("[Clover] Erreur : " .. tostring(err))
     end
 end)
-```
