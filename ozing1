@@ -88,44 +88,26 @@ local function validateKey(key)
     return data.valid == true, data.reason
 end
 
--- Ouvrir Discord
-local function openDiscord()
-    -- Copier le lien dans le presse-papier si disponible
-    if setclipboard then
-        pcall(function()
-            setclipboard(DISCORD_URL)
-        end)
-    elseif toclipboard then
-        pcall(function()
-            toclipboard(DISCORD_URL)
-        end)
-    end
-
-    -- Tentative d'ouverture directe
-    local success = false
+-- Discord
+local function joinDiscord()
+    local copied = false
 
     pcall(function()
-        if syn and syn.open_url then
-            syn.open_url(DISCORD_URL)
-            success = true
+        if setclipboard then
+            setclipboard(DISCORD_URL)
+            copied = true
+        elseif toclipboard then
+            toclipboard(DISCORD_URL)
+            copied = true
         end
     end)
 
-    if not success then
-        pcall(function()
-            if open_url then
-                open_url(DISCORD_URL)
-                success = true
-            end
-        end)
-    end
-
-    -- Si l'exécuteur ne permet pas l'ouverture directe,
-    -- le lien reste copié dans le presse-papier.
+    return copied
 end
 
 -- UI
 local function showKeyUI(onValid)
+
     local gui = Instance.new("ScreenGui")
     gui.Name = "CloverKeySystem"
     gui.ResetOnSpawn = false
@@ -133,6 +115,7 @@ local function showKeyUI(onValid)
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
+    -- Background
     local background = Instance.new("Frame")
     background.Size = UDim2.fromScale(1, 1)
     background.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
@@ -140,10 +123,11 @@ local function showKeyUI(onValid)
     background.BorderSizePixel = 0
     background.Parent = gui
 
+    -- Card
     local card = Instance.new("Frame")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(380, 320)
+    card.Size = UDim2.fromOffset(380, 340)
     card.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
     card.BorderSizePixel = 0
     card.Parent = background
@@ -160,42 +144,50 @@ local function showKeyUI(onValid)
     -- Title
     local title = Instance.new("TextLabel")
     title.BackgroundTransparency = 1
-    title.Position = UDim2.fromOffset(0, 24)
-    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.fromOffset(20, 20)
+    title.Size = UDim2.new(1, -40, 0, 30)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 20
     title.TextColor3 = Color3.fromRGB(235, 240, 245)
     title.Text = "Clover — Clé d'accès"
+    title.TextXAlignment = Enum.TextXAlignment.Center
     title.Parent = card
 
     -- Subtitle
     local subtitle = Instance.new("TextLabel")
     subtitle.BackgroundTransparency = 1
-    subtitle.Position = UDim2.fromOffset(0, 56)
-    subtitle.Size = UDim2.new(1, 0, 0, 18)
+    subtitle.Position = UDim2.fromOffset(20, 52)
+    subtitle.Size = UDim2.new(1, -40, 0, 20)
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 12
     subtitle.TextColor3 = Color3.fromRGB(140, 150, 160)
     subtitle.Text = "Entrez votre clé pour continuer"
+    subtitle.TextXAlignment = Enum.TextXAlignment.Center
     subtitle.Parent = card
 
-    -- Key TextBox
+    -- Key Box
     local box = Instance.new("TextBox")
     box.Name = "KeyInput"
-    box.Position = UDim2.fromOffset(30, 94)
+    box.Position = UDim2.fromOffset(30, 90)
     box.Size = UDim2.fromOffset(320, 44)
+
     box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     box.BorderSizePixel = 0
-    box.TextColor3 = Color3.fromRGB(235, 240, 245)
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 14
+
     box.Text = ""
     box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
     box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
+
+    box.TextColor3 = Color3.fromRGB(235, 240, 245)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 14
+
     box.ClearTextOnFocus = false
     box.MultiLine = false
+
     box.TextXAlignment = Enum.TextXAlignment.Left
     box.TextYAlignment = Enum.TextYAlignment.Center
+
     box.Parent = card
 
     local boxCorner = Instance.new("UICorner")
@@ -207,53 +199,81 @@ local function showKeyUI(onValid)
     padding.PaddingRight = UDim.new(0, 14)
     padding.Parent = box
 
-    -- Discord Button
+    -- DISCORD BUTTON
     local discordButton = Instance.new("TextButton")
     discordButton.Name = "DiscordButton"
+
     discordButton.Position = UDim2.fromOffset(30, 148)
-    discordButton.Size = UDim2.fromOffset(320, 32)
-    discordButton.BackgroundTransparency = 1
+    discordButton.Size = UDim2.fromOffset(320, 38)
+
+    discordButton.BackgroundColor3 = Color3.fromRGB(65, 70, 105)
     discordButton.BorderSizePixel = 0
-    discordButton.Font = Enum.Font.Gotham
-    discordButton.TextSize = 12
-    discordButton.TextColor3 = Color3.fromRGB(130, 170, 220)
-    discordButton.Text = "Rejoindre le Discord"
-    discordButton.AutoButtonColor = false
+
+    discordButton.Font = Enum.Font.GothamSemibold
+    discordButton.TextSize = 13
+    discordButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    discordButton.Text = "Rejoindre notre Discord"
+
+    discordButton.AutoButtonColor = true
+    discordButton.Active = true
+
+    discordButton.ZIndex = 10
     discordButton.Parent = card
 
-    discordButton.MouseEnter:Connect(function()
-        discordButton.TextColor3 = Color3.fromRGB(170, 200, 245)
-    end)
+    local discordCorner = Instance.new("UICorner")
+    discordCorner.CornerRadius = UDim.new(0, 8)
+    discordCorner.Parent = discordButton
 
-    discordButton.MouseLeave:Connect(function()
-        discordButton.TextColor3 = Color3.fromRGB(130, 170, 220)
-    end)
-
+    -- Discord click
     discordButton.MouseButton1Click:Connect(function()
-        openDiscord()
+
+        local copied = joinDiscord()
+
+        if copied then
+            discordButton.Text = "✓ Lien Discord copié !"
+        else
+            discordButton.Text = "discord.gg/hXTNQZSSKP"
+        end
+
+        task.delay(2, function()
+            if discordButton and discordButton.Parent then
+                discordButton.Text = "Rejoindre notre Discord"
+            end
+        end)
     end)
 
     -- Status
     local status = Instance.new("TextLabel")
+    status.Name = "Status"
+
     status.BackgroundTransparency = 1
-    status.Position = UDim2.fromOffset(30, 177)
-    status.Size = UDim2.fromOffset(320, 22)
+    status.Position = UDim2.fromOffset(30, 190)
+    status.Size = UDim2.fromOffset(320, 24)
+
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
     status.Text = ""
+
     status.TextXAlignment = Enum.TextXAlignment.Center
     status.Parent = card
 
-    -- Button
+    -- Validate Button
     local button = Instance.new("TextButton")
-    button.Position = UDim2.fromOffset(30, 207)
+    button.Name = "ValidateButton"
+
+    button.Position = UDim2.fromOffset(30, 225)
     button.Size = UDim2.fromOffset(320, 44)
+
     button.BackgroundColor3 = Color3.fromRGB(45, 200, 130)
     button.BorderSizePixel = 0
+
     button.TextColor3 = Color3.fromRGB(255, 255, 255)
     button.Font = Enum.Font.GothamSemibold
     button.TextSize = 15
+
     button.Text = "Valider la clé"
+
     button.Parent = card
 
     local buttonCorner = Instance.new("UICorner")
@@ -262,8 +282,9 @@ local function showKeyUI(onValid)
 
     local checking = false
 
-    -- Status message
+    -- Status
     local function setStatus(message, success)
+
         status.Text = message
 
         if success then
@@ -273,8 +294,9 @@ local function showKeyUI(onValid)
         end
     end
 
-    -- Validate key
+    -- Validate
     local function tryValidate()
+
         if checking then
             return
         end
@@ -287,13 +309,17 @@ local function showKeyUI(onValid)
         end
 
         checking = true
+
         button.Text = "Vérification..."
+
         setStatus("", false)
 
         task.spawn(function()
+
             local valid, reason = validateKey(key)
 
             if valid then
+
                 setStatus(
                     "Clé valide ! Chargement de Clover...",
                     true
@@ -304,6 +330,7 @@ local function showKeyUI(onValid)
                 gui:Destroy()
 
                 onValid()
+
                 return
             end
 
@@ -322,6 +349,7 @@ local function showKeyUI(onValid)
             )
 
             button.Text = "Valider la clé"
+
             checking = false
         end)
     end
@@ -329,27 +357,35 @@ local function showKeyUI(onValid)
     -- Button
     button.MouseButton1Click:Connect(tryValidate)
 
-    -- Enter key
+    -- Enter
     box.FocusLost:Connect(function(enterPressed)
+
         if enterPressed then
             tryValidate()
         end
+
     end)
 
-    -- Auto-focus
+    -- Auto focus
     task.defer(function()
         box:CaptureFocus()
     end)
 end
 
--- Chargement de Clover
+-- Load Clover
 showKeyUI(function()
+
     local ok, err = pcall(function()
-        loadstring(game:HttpGet(MAIN_SCRIPT))()
+        loadstring(
+            game:HttpGet(MAIN_SCRIPT)
+        )()
     end)
 
     if not ok then
-        warn("[Clover] Erreur : " .. tostring(err))
+        warn(
+            "[Clover] Erreur : "
+            .. tostring(err)
+        )
     end
 end)
 ```
