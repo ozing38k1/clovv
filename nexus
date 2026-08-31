@@ -1,5 +1,5 @@
 ```lua
--- CloverHub — Minimal Key System
+-- CloverHub — Key System Loader
 
 local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
@@ -11,10 +11,7 @@ local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
---------------------------------------------------
--- HTTP
---------------------------------------------------
-
+-- HTTP request
 local function httpRequest(url, method, body)
     local requestFn =
         request
@@ -26,16 +23,14 @@ local function httpRequest(url, method, body)
         return nil, 0
     end
 
-    local ok, response = pcall(function()
-        return requestFn({
-            Url = url,
-            Method = method,
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = body
-        })
-    end)
+    local ok, response = pcall(requestFn, {
+        Url = url,
+        Method = method,
+        Headers = {
+            ["Content-Type"] = "application/json"
+        },
+        Body = body
+    })
 
     if not ok or not response then
         return nil, 0
@@ -44,10 +39,7 @@ local function httpRequest(url, method, body)
     return response.Body, response.StatusCode
 end
 
---------------------------------------------------
 -- HWID
---------------------------------------------------
-
 local function getHWID()
     local ok, id = pcall(function()
         if gethwid then
@@ -64,10 +56,7 @@ local function getHWID()
     return "unknown-" .. tostring(LocalPlayer.UserId)
 end
 
---------------------------------------------------
--- VALIDATION
---------------------------------------------------
-
+-- Validation
 local function validateKey(key)
     local body = HttpService:JSONEncode({
         key_code = key,
@@ -75,13 +64,13 @@ local function validateKey(key)
         username = LocalPlayer.Name
     })
 
-    local raw, statusCode = httpRequest(
+    local raw, code = httpRequest(
         VALIDATE_URL,
         "POST",
         body
     )
 
-    if not raw or statusCode ~= 200 then
+    if not raw or code ~= 200 then
         return false, "server_error"
     end
 
@@ -89,53 +78,40 @@ local function validateKey(key)
         return HttpService:JSONDecode(raw)
     end)
 
-    if not ok or type(data) ~= "table" then
+    if not ok or not data then
         return false, "server_error"
     end
 
     return data.valid == true, data.reason
 end
 
---------------------------------------------------
--- MENU
---------------------------------------------------
-
-local function createMenu()
-    local parent
-
-    if gethui then
-        parent = gethui()
-    else
-        parent = game:GetService("CoreGui")
-    end
-
+-- UI
+local function showKeyUI(onValid)
     local gui = Instance.new("ScreenGui")
     gui.Name = "CloverKeySystem"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = parent
+    gui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
-    -- Background
     local background = Instance.new("Frame")
     background.Size = UDim2.fromScale(1, 1)
     background.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
-    background.BackgroundTransparency = 0.15
+    background.BackgroundTransparency = 0.18
     background.BorderSizePixel = 0
     background.Parent = gui
 
-    -- Card
     local card = Instance.new("Frame")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(380, 260)
+    card.Size = UDim2.fromOffset(380, 300)
     card.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
     card.BorderSizePixel = 0
     card.Parent = background
 
-    local cardCorner = Instance.new("UICorner")
-    cardCorner.CornerRadius = UDim.new(0, 14)
-    cardCorner.Parent = card
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 14)
+    corner.Parent = card
 
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(45, 50, 60)
@@ -145,10 +121,10 @@ local function createMenu()
     -- Title
     local title = Instance.new("TextLabel")
     title.BackgroundTransparency = 1
-    title.Position = UDim2.fromOffset(20, 22)
-    title.Size = UDim2.new(1, -40, 0, 32)
+    title.Position = UDim2.fromOffset(0, 24)
+    title.Size = UDim2.new(1, 0, 0, 30)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 21
+    title.TextSize = 20
     title.TextColor3 = Color3.fromRGB(235, 240, 245)
     title.Text = "Clover — Clé d'accès"
     title.TextXAlignment = Enum.TextXAlignment.Center
@@ -157,8 +133,8 @@ local function createMenu()
     -- Subtitle
     local subtitle = Instance.new("TextLabel")
     subtitle.BackgroundTransparency = 1
-    subtitle.Position = UDim2.fromOffset(20, 56)
-    subtitle.Size = UDim2.new(1, -40, 0, 20)
+    subtitle.Position = UDim2.fromOffset(0, 56)
+    subtitle.Size = UDim2.new(1, 0, 0, 18)
     subtitle.Font = Enum.Font.Gotham
     subtitle.TextSize = 12
     subtitle.TextColor3 = Color3.fromRGB(140, 150, 160)
@@ -166,23 +142,33 @@ local function createMenu()
     subtitle.TextXAlignment = Enum.TextXAlignment.Center
     subtitle.Parent = card
 
-    -- Key input
+    -- Key TextBox
     local box = Instance.new("TextBox")
     box.Name = "KeyInput"
     box.Position = UDim2.fromOffset(30, 94)
     box.Size = UDim2.fromOffset(320, 44)
+
     box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     box.BorderSizePixel = 0
+
+    -- IMPORTANT :
+    -- Le champ est réellement vide au lancement.
     box.Text = ""
-    box.PlaceholderText = "Entrez votre clé..."
+
+    -- Ceci est uniquement le texte d'indication.
+    box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
     box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
+
+    box.ClearTextOnFocus = false
+    box.MultiLine = false
+
     box.TextColor3 = Color3.fromRGB(235, 240, 245)
     box.Font = Enum.Font.Gotham
     box.TextSize = 14
-    box.ClearTextOnFocus = false
-    box.MultiLine = false
+
     box.TextXAlignment = Enum.TextXAlignment.Left
     box.TextYAlignment = Enum.TextYAlignment.Center
+
     box.Parent = card
 
     local boxCorner = Instance.new("UICorner")
@@ -197,7 +183,7 @@ local function createMenu()
     -- Status
     local status = Instance.new("TextLabel")
     status.BackgroundTransparency = 1
-    status.Position = UDim2.fromOffset(30, 145)
+    status.Position = UDim2.fromOffset(30, 148)
     status.Size = UDim2.fromOffset(320, 22)
     status.Font = Enum.Font.Gotham
     status.TextSize = 12
@@ -207,7 +193,7 @@ local function createMenu()
 
     -- Button
     local button = Instance.new("TextButton")
-    button.Position = UDim2.fromOffset(30, 180)
+    button.Position = UDim2.fromOffset(30, 184)
     button.Size = UDim2.fromOffset(320, 44)
     button.BackgroundColor3 = Color3.fromRGB(45, 200, 130)
     button.BorderSizePixel = 0
@@ -221,97 +207,96 @@ local function createMenu()
     buttonCorner.CornerRadius = UDim.new(0, 8)
     buttonCorner.Parent = button
 
-    return gui, box, status, button
-end
+    local checking = false
 
---------------------------------------------------
--- START
---------------------------------------------------
+    -- Status message
+    local function setStatus(message, success)
+        status.Text = message
 
-local gui, box, status, button = createMenu()
-
-local checking = false
-
-local function setStatus(message, success)
-    status.Text = message
-
-    if success then
-        status.TextColor3 = Color3.fromRGB(110, 200, 130)
-    else
-        status.TextColor3 = Color3.fromRGB(210, 120, 130)
-    end
-end
-
-local function checkKey()
-    if checking then
-        return
+        if success then
+            status.TextColor3 = Color3.fromRGB(110, 200, 130)
+        else
+            status.TextColor3 = Color3.fromRGB(210, 120, 130)
+        end
     end
 
-    local key = box.Text:gsub("%s+", "")
-
-    if key == "" then
-        setStatus("Veuillez entrer une clé.", false)
-        return
-    end
-
-    checking = true
-    button.Text = "Vérification..."
-    setStatus("", false)
-
-    task.spawn(function()
-        local valid, reason = validateKey(key)
-
-        if valid then
-            setStatus(
-                "Clé valide ! Chargement...",
-                true
-            )
-
-            task.wait(0.5)
-
-            gui:Destroy()
-
-            local ok, err = pcall(function()
-                loadstring(
-                    game:HttpGet(MAIN_SCRIPT)
-                )()
-            end)
-
-            if not ok then
-                warn("[Clover] Erreur : " .. tostring(err))
-            end
-
+    -- Validate key
+    local function tryValidate()
+        if checking then
             return
         end
 
-        local messages = {
-            invalid_key = "Clé invalide.",
-            missing_key = "Clé manquante.",
-            hwid_mismatch = "Clé utilisée sur un autre appareil.",
-            expired = "Clé expirée.",
-            blacklisted = "Clé blacklistée.",
-            server_error = "Erreur serveur. Réessayez."
-        }
+        local key = box.Text:gsub("%s+", "")
 
-        setStatus(
-            messages[reason] or "Clé invalide.",
-            false
-        )
+        if key == "" then
+            setStatus("Veuillez entrer une clé.", false)
+            return
+        end
 
-        button.Text = "Valider la clé"
-        checking = false
+        checking = true
+        button.Text = "Vérification..."
+        setStatus("", false)
+
+        task.spawn(function()
+            local valid, reason = validateKey(key)
+
+            if valid then
+                setStatus(
+                    "Clé valide ! Chargement de Clover...",
+                    true
+                )
+
+                task.wait(0.6)
+
+                gui:Destroy()
+
+                onValid()
+                return
+            end
+
+            local messages = {
+                invalid_key = "Clé invalide, expirée ou blacklistée.",
+                missing_key = "Clé manquante.",
+                hwid_mismatch = "Clé utilisée sur un autre appareil.",
+                expired = "Clé expirée ou blacklistée.",
+                server_error = "Erreur serveur. Réessayez."
+            }
+
+            setStatus(
+                messages[reason] or
+                "Clé invalide, expirée ou blacklistée.",
+                false
+            )
+
+            button.Text = "Valider la clé"
+            checking = false
+        end)
+    end
+
+    -- Button
+    button.MouseButton1Click:Connect(tryValidate)
+
+    -- Enter
+    box.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            tryValidate()
+        end
+    end)
+
+    -- Auto-focus
+    task.defer(function()
+        box:CaptureFocus()
     end)
 end
 
-button.MouseButton1Click:Connect(checkKey)
+-- Chargement de Clover
+showKeyUI(function()
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet(MAIN_SCRIPT))()
+    end)
 
-box.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        checkKey()
+    if not ok then
+        warn("[Clover] Erreur : " .. tostring(err))
     end
-end)
-
-task.defer(function()
-    box:CaptureFocus()
 end)
 ```
