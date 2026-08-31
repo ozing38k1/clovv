@@ -1,3 +1,4 @@
+```lua
 -- CloverHub — Key System Loader
 
 local VALIDATE_URL =
@@ -126,6 +127,7 @@ local function showKeyUI(onValid)
     title.TextSize = 20
     title.TextColor3 = Color3.fromRGB(235, 240, 245)
     title.Text = "Clover — Clé d'accès"
+    title.TextXAlignment = Enum.TextXAlignment.Center
     title.Parent = card
 
     -- Subtitle
@@ -137,6 +139,7 @@ local function showKeyUI(onValid)
     subtitle.TextSize = 12
     subtitle.TextColor3 = Color3.fromRGB(140, 150, 160)
     subtitle.Text = "Entrez votre clé pour continuer"
+    subtitle.TextXAlignment = Enum.TextXAlignment.Center
     subtitle.Parent = card
 
     -- Key TextBox
@@ -144,24 +147,22 @@ local function showKeyUI(onValid)
     box.Name = "KeyInput"
     box.Position = UDim2.fromOffset(30, 94)
     box.Size = UDim2.fromOffset(320, 44)
-
     box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
     box.BorderSizePixel = 0
 
-    box.TextColor3 = Color3.fromRGB(235, 240, 245)
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 14
-
-    -- IMPORTANT :
-    -- La TextBox est complètement vide au lancement.
+    -- Champ vide au lancement
     box.Text = ""
 
-    -- Le texte affiché quand elle est vide est seulement un placeholder.
+    -- Placeholder uniquement
     box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
     box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
 
     box.ClearTextOnFocus = false
     box.MultiLine = false
+
+    box.TextColor3 = Color3.fromRGB(235, 240, 245)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 14
 
     box.TextXAlignment = Enum.TextXAlignment.Left
     box.TextYAlignment = Enum.TextYAlignment.Center
@@ -211,9 +212,11 @@ local function showKeyUI(onValid)
         status.Text = message
 
         if success then
-            status.TextColor3 = Color3.fromRGB(110, 200, 130)
+            status.TextColor3 =
+                Color3.fromRGB(110, 200, 130)
         else
-            status.TextColor3 = Color3.fromRGB(210, 120, 130)
+            status.TextColor3 =
+                Color3.fromRGB(210, 120, 130)
         end
     end
 
@@ -226,7 +229,10 @@ local function showKeyUI(onValid)
         local key = box.Text:gsub("%s+", "")
 
         if key == "" then
-            setStatus("Veuillez entrer une clé.", false)
+            setStatus(
+                "Veuillez entrer une clé.",
+                false
+            )
             return
         end
 
@@ -237,6 +243,7 @@ local function showKeyUI(onValid)
         task.spawn(function()
             local valid, reason = validateKey(key)
 
+            -- Clé valide
             if valid then
                 setStatus(
                     "Clé valide ! Chargement de Clover...",
@@ -251,12 +258,25 @@ local function showKeyUI(onValid)
                 return
             end
 
+            -- Messages d'erreur
             local messages = {
-                invalid_key = "Clé invalide.",
-                missing_key = "Clé manquante.",
-                hwid_mismatch = "Clé utilisée sur un autre appareil.",
-                expired = "Votre clé a expiré.",
-                server_error = "Erreur serveur. Réessayez."
+                invalid_key =
+                    "Clé invalide.",
+
+                missing_key =
+                    "Clé manquante.",
+
+                hwid_mismatch =
+                    "Clé utilisée sur un autre appareil.",
+
+                expired =
+                    "Clé expirée.",
+
+                blacklisted =
+                    "Clé blacklistée.",
+
+                server_error =
+                    "Erreur serveur. Réessayez."
             }
 
             setStatus(
@@ -270,16 +290,18 @@ local function showKeyUI(onValid)
     end
 
     -- Button
-    button.MouseButton1Click:Connect(tryValidate)
+    button.MouseButton1Click:Connect(
+        tryValidate
+    )
 
-    -- Enter key
+    -- Enter
     box.FocusLost:Connect(function(enterPressed)
         if enterPressed then
             tryValidate()
         end
     end)
 
-    -- Auto-focus sur la case de clé
+    -- Auto-focus
     task.defer(function()
         box:CaptureFocus()
     end)
@@ -288,10 +310,16 @@ end
 -- Chargement de Clover
 showKeyUI(function()
     local ok, err = pcall(function()
-        loadstring(game:HttpGet(MAIN_SCRIPT))()
+        loadstring(
+            game:HttpGet(MAIN_SCRIPT)
+        )()
     end)
 
     if not ok then
-        warn("[Clover] Erreur : " .. tostring(err))
+        warn(
+            "[Clover] Erreur : "
+            .. tostring(err)
+        )
     end
 end)
+```
