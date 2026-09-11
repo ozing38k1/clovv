@@ -4,7 +4,7 @@ local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
 local MAIN_SCRIPT =
-    "https://raw.githubusercontent.com/Ryuun0x/Clover/refs/heads/main/main.lua"
+    "loadstring(game:HttpGet("https://cloverhub.app/clover.lua"))()"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
