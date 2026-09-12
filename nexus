@@ -7,7 +7,7 @@ local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
 local MAIN_SCRIPT =
-    "HttpGet'https://api.rubis.app/v2/scrap/MZ9c5XoiFwycdLRC/raw"
+    "https://api.luarmor.net/files/v4/loaders/9ee4edde227ac85f50872bf9e4226508.lua"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
