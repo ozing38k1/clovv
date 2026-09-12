@@ -7,7 +7,7 @@ local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
 local MAIN_SCRIPT =
-    "https://rawscripts.net/raw/Steal-An-Egg-Clover-Hub-or-Auto-Steal-Egg-Predictor-Auto-Hatch-and-ESP-226600"
+    "https://raw.githubusercontent.com/Dodoyung24/script-core/main/Steal-An-Egg"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -161,7 +161,7 @@ local function createGui()
     Title.Size = UDim2.new(1, -40, 0, 42)
     Title.Position = UDim2.new(0, 20, 0, 22)
     Title.BackgroundTransparency = 1
-    Title.Text = "CloverHub"
+    Title.Text = "Nexus"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = 25
     Title.Font = Enum.Font.GothamBold
