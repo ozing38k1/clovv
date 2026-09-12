@@ -7,14 +7,14 @@ local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
 local MAIN_SCRIPT =
-    "https://raw.githubusercontent.com/davizin713/ONhub/refs/heads/main/script.lua"
+    "https://raw.githubusercontent.com/Dodoyung24/script-core/main/Steal-An-Egg"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 -- =========================================================
--- HTTP
+-- HTTP REQUEST
 -- =========================================================
 
 local function httpRequest(url, method, body)
@@ -103,10 +103,11 @@ local function validateKey(key)
 end
 
 -- =========================================================
--- NEXUS SUCCESS BAR
+-- NEXUS BAR — TOUT EN HAUT
 -- =========================================================
 
 local function showSuccessNotification()
+
     local guiParent
 
     if type(gethui) == "function" then
@@ -142,21 +143,25 @@ local function showSuccessNotification()
     local gui = Instance.new("ScreenGui")
     gui.Name = "NexusSuccessNotification"
     gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = guiParent
 
     -- Barre principale
     local frame = Instance.new("Frame")
     frame.Name = "Notification"
+
+    -- TOUT EN HAUT + CENTRÉ
     frame.AnchorPoint = Vector2.new(0.5, 0)
-    frame.Position = UDim2.new(0.5, 0, 0, 15)
+    frame.Position = UDim2.new(0.5, 0, 0, 0)
+
     frame.Size = UDim2.new(0, 700, 0, 44)
     frame.BackgroundColor3 = Color3.fromRGB(16, 17, 21)
     frame.BorderSizePixel = 0
     frame.Parent = gui
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 9)
+    corner.CornerRadius = UDim.new(0, 0)
     corner.Parent = frame
 
     local stroke = Instance.new("UIStroke")
@@ -165,11 +170,20 @@ local function showSuccessNotification()
     stroke.Transparency = 0.15
     stroke.Parent = frame
 
-    -- Petit indicateur
+    -- Ligne verte
+    local topLine = Instance.new("Frame")
+    topLine.Name = "TopLine"
+    topLine.Position = UDim2.new(0, 0, 0, 0)
+    topLine.Size = UDim2.new(1, 0, 0, 2)
+    topLine.BackgroundColor3 = Color3.fromRGB(80, 220, 140)
+    topLine.BorderSizePixel = 0
+    topLine.Parent = frame
+
+    -- Point de statut
     local dot = Instance.new("Frame")
     dot.Name = "StatusDot"
     dot.AnchorPoint = Vector2.new(0, 0.5)
-    dot.Position = UDim2.new(0, 13, 0.5, 0)
+    dot.Position = UDim2.new(0, 14, 0.5, 0)
     dot.Size = UDim2.new(0, 8, 0, 8)
     dot.BackgroundColor3 = Color3.fromRGB(80, 220, 140)
     dot.BorderSizePixel = 0
@@ -185,8 +199,10 @@ local function showSuccessNotification()
     text.Position = UDim2.new(0, 30, 0, 0)
     text.Size = UDim2.new(1, -45, 1, 0)
     text.BackgroundTransparency = 1
+
     text.Text =
         "Nexus | Discord link : https://discord.gg/6VKewtN6hW | Script Successfully load !"
+
     text.TextColor3 = Color3.fromRGB(235, 237, 242)
     text.TextSize = 13
     text.Font = Enum.Font.GothamMedium
@@ -200,6 +216,7 @@ end
 -- =========================================================
 
 local function showKeyUI()
+
     local guiParent
 
     if type(gethui) == "function" then
@@ -289,7 +306,7 @@ local function showKeyUI()
     description.TextXAlignment = Enum.TextXAlignment.Center
     description.Parent = card
 
-    -- Key box
+    -- Key Box
     local box = Instance.new("TextBox")
     box.Name = "KeyInput"
     box.Position = UDim2.fromOffset(30, 100)
@@ -346,6 +363,7 @@ local function showKeyUI()
 
     local checking = false
 
+    -- Status
     local function setStatus(message, success)
         status.Text = message
 
@@ -357,22 +375,21 @@ local function showKeyUI()
     end
 
     -- =====================================================
-    -- LOAD NEW SCRIPT
+    -- LOAD SCRIPT
     -- =====================================================
 
     local function loadMainScript()
+
         local ok, err = pcall(function()
-            -- Récupère uniquement le nouveau script
+
             local source = game:HttpGet(MAIN_SCRIPT)
 
-            -- Compile le script
             local fn, loadError = loadstring(source)
 
             if not fn then
                 error(loadError or "Unable to load script.")
             end
 
-            -- Exécute le nouveau script
             fn()
         end)
 
@@ -381,16 +398,17 @@ local function showKeyUI()
             return
         end
 
-        -- Affiche la notification Nexus
         task.wait(0.2)
+
         showSuccessNotification()
     end
 
     -- =====================================================
-    -- VALIDATE
+    -- VALIDATE KEY
     -- =====================================================
 
     local function tryValidate()
+
         if checking then
             return
         end
@@ -405,12 +423,15 @@ local function showKeyUI()
         checking = true
         button.Active = false
         button.Text = "Checking..."
+
         setStatus("Vérification de la clé...", true)
 
         task.spawn(function()
+
             local valid, reason = validateKey(key)
 
             if valid then
+
                 setStatus("Clé valide !", true)
 
                 task.wait(0.4)
@@ -425,7 +446,7 @@ local function showKeyUI()
             local messages = {
                 invalid_key = "Clé invalide.",
                 missing_key = "Clé manquante.",
-                hwid_mismatch = "Clé utilisée sur un autre appareil.",
+                hwid_mismatch = "HWID does not match.",
                 expired = "Clé expirée.",
                 blacklisted = "Clé blacklistée.",
                 server_error = "Erreur serveur. Réessayez."
@@ -445,12 +466,14 @@ local function showKeyUI()
     button.MouseButton1Click:Connect(tryValidate)
 
     box.FocusLost:Connect(function(enterPressed)
+
         if enterPressed then
             tryValidate()
         end
     end)
 
     task.defer(function()
+
         task.wait(0.25)
 
         pcall(function()
