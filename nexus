@@ -190,7 +190,7 @@ local function createGui()
     Box.BackgroundColor3 = Color3.fromRGB(27, 27, 32)
     Box.BorderSizePixel = 0
     Box.Text = ""
-    Box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
+    Box.PlaceholderText = "XXXXX-XXXXX-XXXXX-XXXXX"
     Box.PlaceholderColor3 = Color3.fromRGB(105, 105, 115)
     Box.TextColor3 = Color3.fromRGB(240, 240, 245)
     Box.TextSize = 14
