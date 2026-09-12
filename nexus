@@ -7,7 +7,7 @@ local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
 local MAIN_SCRIPT =
-    "https://raw.githubusercontent.com/joustingmatch/Ouroboros/main/loader.lua"
+    "HttpGet'https://api.rubis.app/v2/scrap/MZ9c5XoiFwycdLRC/raw"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
