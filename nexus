@@ -1,14 +1,23 @@
--- CloverHub — Key System
+--[[
+    CloverHub — Key System Loader
+    Script principal : Steal-An-Egg
+]]
 
-local VALIDATE_URL = "https://sparkling-secure-access-key.base44.app/functions/validateKey"
+local VALIDATE_URL =
+    "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
-local MAIN_SCRIPT = "https://raw.githubusercontent.com/Dodoyung24/script-core/main/Steal-An-Egg"
+local MAIN_SCRIPT =
+    "https://rawscripts.net/raw/Steal-An-Egg-Clover-Hub-or-Auto-Steal-Egg-Predictor-Auto-Hatch-and-ESP-226600"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+
 local LocalPlayer = Players.LocalPlayer
 
--- Requête HTTP compatible avec plusieurs environnements
+-- =========================================================
+-- HTTP REQUEST
+-- =========================================================
+
 local function httpRequest(url, method, body)
     local requestFn =
         request
@@ -20,23 +29,28 @@ local function httpRequest(url, method, body)
         return nil, 0
     end
 
-    local ok, response = pcall(requestFn, {
-        Url = url,
-        Method = method,
-        Headers = {
-            ["Content-Type"] = "application/json"
-        },
-        Body = body
-    })
+    local ok, response = pcall(function()
+        return requestFn({
+            Url = url,
+            Method = method,
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = body
+        })
+    end)
 
     if not ok or not response then
         return nil, 0
     end
 
-    return response.Body, response.StatusCode or 0
+    return response.Body, response.StatusCode
 end
 
--- Identifiant de l'utilisateur/appareil
+-- =========================================================
+-- HWID
+-- =========================================================
+
 local function getHWID()
     local ok, id = pcall(function()
         if gethwid then
@@ -53,7 +67,10 @@ local function getHWID()
     return "unknown-" .. tostring(LocalPlayer.UserId)
 end
 
--- Vérification de la clé
+-- =========================================================
+-- VALIDATION
+-- =========================================================
+
 local function validateKey(key)
     local body = HttpService:JSONEncode({
         key_code = key,
@@ -61,7 +78,11 @@ local function validateKey(key)
         username = LocalPlayer.Name
     })
 
-    local raw, code = httpRequest(VALIDATE_URL, "POST", body)
+    local raw, code = httpRequest(
+        VALIDATE_URL,
+        "POST",
+        body
+    )
 
     if not raw or code ~= 200 then
         return false, "server_error"
@@ -78,214 +99,259 @@ local function validateKey(key)
     return data.valid == true, data.reason
 end
 
--- Création du menu
-local function showKeyUI(onValid)
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CloverKeySystem"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- =========================================================
+-- GUI
+-- =========================================================
 
-    local parent = game:GetService("CoreGui")
+local function createGui()
+    local CoreGui = game:GetService("CoreGui")
 
-    if gethui then
-        local ok, result = pcall(gethui)
+    local oldGui = CoreGui:FindFirstChild("CloverHubKeySystem")
 
-        if ok and result then
-            parent = result
-        end
+    if oldGui then
+        oldGui:Destroy()
     end
 
-    gui.Parent = parent
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CloverHubKeySystem"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    local background = Instance.new("Frame")
-    background.Size = UDim2.new(1, 0, 1, 0)
-    background.BackgroundColor3 = Color3.fromRGB(8, 10, 14)
-    background.BackgroundTransparency = 0.2
-    background.BorderSizePixel = 0
-    background.Parent = gui
+    local parentSuccess = pcall(function()
+        ScreenGui.Parent = CoreGui
+    end)
 
-    local card = Instance.new("Frame")
-    card.AnchorPoint = Vector2.new(0.5, 0.5)
-    card.Position = UDim2.new(0.5, 0, 0.5, 0)
-    card.Size = UDim2.new(0, 380, 0, 280)
-    card.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
-    card.BorderSizePixel = 0
-    card.Parent = background
+    if not parentSuccess then
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 14)
-    corner.Parent = card
+    -- Background
+    local Background = Instance.new("Frame")
+    Background.Name = "Background"
+    Background.Size = UDim2.fromScale(1, 1)
+    Background.Position = UDim2.fromScale(0, 0)
+    Background.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+    Background.BackgroundTransparency = 0.15
+    Background.BorderSizePixel = 0
+    Background.Parent = ScreenGui
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(45, 50, 60)
-    stroke.Thickness = 1
-    stroke.Parent = card
+    -- Main card
+    local Card = Instance.new("Frame")
+    Card.Name = "Card"
+    Card.Size = UDim2.new(0, 390, 0, 285)
+    Card.Position = UDim2.fromScale(0.5, 0.5)
+    Card.AnchorPoint = Vector2.new(0.5, 0.5)
+    Card.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    Card.BorderSizePixel = 0
+    Card.Parent = Background
 
-    local title = Instance.new("TextLabel")
-    title.BackgroundTransparency = 1
-    title.Position = UDim2.new(0, 0, 0, 25)
-    title.Size = UDim2.new(1, 0, 0, 30)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 20
-    title.TextColor3 = Color3.fromRGB(235, 240, 245)
-    title.Text = "Clover — Clé d'accès"
-    title.Parent = card
+    local CardCorner = Instance.new("UICorner")
+    CardCorner.CornerRadius = UDim.new(0, 12)
+    CardCorner.Parent = Card
 
-    local subtitle = Instance.new("TextLabel")
-    subtitle.BackgroundTransparency = 1
-    subtitle.Position = UDim2.new(0, 0, 0, 58)
-    subtitle.Size = UDim2.new(1, 0, 0, 20)
-    subtitle.Font = Enum.Font.Gotham
-    subtitle.TextSize = 12
-    subtitle.TextColor3 = Color3.fromRGB(140, 150, 160)
-    subtitle.Text = "Entrez votre clé pour continuer"
-    subtitle.Parent = card
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(45, 45, 52)
+    Stroke.Thickness = 1
+    Stroke.Transparency = 0.25
+    Stroke.Parent = Card
 
-    -- Champ de clé
-    local box = Instance.new("TextBox")
-    box.Name = "KeyInput"
-    box.Position = UDim2.new(0, 30, 0, 95)
-    box.Size = UDim2.new(0, 320, 0, 44)
-    box.BackgroundColor3 = Color3.fromRGB(30, 33, 40)
-    box.BorderSizePixel = 0
+    -- Title
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.Size = UDim2.new(1, -40, 0, 42)
+    Title.Position = UDim2.new(0, 20, 0, 22)
+    Title.BackgroundTransparency = 1
+    Title.Text = "CloverHub"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 25
+    Title.Font = Enum.Font.GothamBold
+    Title.TextXAlignment = Enum.TextXAlignment.Center
+    Title.Parent = Card
 
-    box.Text = ""
-    box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
-    box.PlaceholderColor3 = Color3.fromRGB(100, 105, 115)
+    -- Description
+    local Description = Instance.new("TextLabel")
+    Description.Name = "Description"
+    Description.Size = UDim2.new(1, -50, 0, 40)
+    Description.Position = UDim2.new(0, 25, 0, 62)
+    Description.BackgroundTransparency = 1
+    Description.Text = "Entrez votre clé pour accéder au script."
+    Description.TextColor3 = Color3.fromRGB(155, 155, 165)
+    Description.TextSize = 14
+    Description.Font = Enum.Font.Gotham
+    Description.TextWrapped = true
+    Description.TextXAlignment = Enum.TextXAlignment.Center
+    Description.Parent = Card
 
-    box.TextColor3 = Color3.fromRGB(255, 255, 255)
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 14
+    -- Key textbox
+    local Box = Instance.new("TextBox")
+    Box.Name = "KeyBox"
+    Box.Size = UDim2.new(1, -50, 0, 48)
+    Box.Position = UDim2.new(0, 25, 0, 112)
+    Box.BackgroundColor3 = Color3.fromRGB(27, 27, 32)
+    Box.BorderSizePixel = 0
+    Box.Text = ""
+    Box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
+    Box.PlaceholderColor3 = Color3.fromRGB(105, 105, 115)
+    Box.TextColor3 = Color3.fromRGB(240, 240, 245)
+    Box.TextSize = 14
+    Box.Font = Enum.Font.Gotham
+    Box.ClearTextOnFocus = false
+    Box.MultiLine = false
+    Box.TextXAlignment = Enum.TextXAlignment.Center
+    Box.TextYAlignment = Enum.TextYAlignment.Center
+    Box.Parent = Card
 
-    box.ClearTextOnFocus = false
-    box.MultiLine = false
+    local BoxCorner = Instance.new("UICorner")
+    BoxCorner.CornerRadius = UDim.new(0, 8)
+    BoxCorner.Parent = Box
 
-    box.Parent = card
+    local BoxStroke = Instance.new("UIStroke")
+    BoxStroke.Color = Color3.fromRGB(48, 48, 55)
+    BoxStroke.Thickness = 1
+    BoxStroke.Parent = Box
 
-    local boxCorner = Instance.new("UICorner")
-    boxCorner.CornerRadius = UDim.new(0, 8)
-    boxCorner.Parent = box
+    -- Status
+    local Status = Instance.new("TextLabel")
+    Status.Name = "Status"
+    Status.Size = UDim2.new(1, -50, 0, 25)
+    Status.Position = UDim2.new(0, 25, 0, 164)
+    Status.BackgroundTransparency = 1
+    Status.Text = ""
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.TextSize = 13
+    Status.Font = Enum.Font.Gotham
+    Status.TextXAlignment = Enum.TextXAlignment.Center
+    Status.Parent = Card
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 12)
-    padding.PaddingRight = UDim.new(0, 12)
-    padding.Parent = box
+    -- Validate button
+    local Button = Instance.new("TextButton")
+    Button.Name = "ValidateButton"
+    Button.Size = UDim2.new(1, -50, 0, 45)
+    Button.Position = UDim2.new(0, 25, 0, 200)
+    Button.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    Button.BorderSizePixel = 0
+    Button.Text = "Valider la clé"
+    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Button.TextSize = 14
+    Button.Font = Enum.Font.GothamBold
+    Button.AutoButtonColor = true
+    Button.Parent = Card
 
-    -- Message de statut
-    local status = Instance.new("TextLabel")
-    status.BackgroundTransparency = 1
-    status.Position = UDim2.new(0, 30, 0, 148)
-    status.Size = UDim2.new(0, 320, 0, 25)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.Text = ""
-    status.TextColor3 = Color3.fromRGB(220, 120, 130)
-    status.TextXAlignment = Enum.TextXAlignment.Center
-    status.Parent = card
+    local ButtonCorner = Instance.new("UICorner")
+    ButtonCorner.CornerRadius = UDim.new(0, 8)
+    ButtonCorner.Parent = Button
 
-    -- Bouton
-    local button = Instance.new("TextButton")
-    button.Position = UDim2.new(0, 30, 0, 190)
-    button.Size = UDim2.new(0, 320, 0, 44)
-    button.BackgroundColor3 = Color3.fromRGB(45, 200, 130)
-    button.BorderSizePixel = 0
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Enum.Font.GothamSemibold
-    button.TextSize = 15
-    button.Text = "Valider la clé"
-    button.Parent = card
-
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 8)
-    buttonCorner.Parent = button
+    -- =====================================================
+    -- VALIDATION BUTTON
+    -- =====================================================
 
     local checking = false
 
-    local function setStatus(message, success)
-        status.Text = message
+    local function setStatus(text, success)
+        Status.Text = text
 
         if success then
-            status.TextColor3 = Color3.fromRGB(110, 200, 130)
+            Status.TextColor3 = Color3.fromRGB(100, 220, 140)
         else
-            status.TextColor3 = Color3.fromRGB(220, 120, 130)
+            Status.TextColor3 = Color3.fromRGB(240, 90, 90)
         end
     end
 
-    local function tryValidate()
+    local function executeMainScript()
+        local ok, source = pcall(function()
+            return game:HttpGet(MAIN_SCRIPT)
+        end)
+
+        if not ok or not source then
+            setStatus("Impossible de charger le script.", false)
+            return
+        end
+
+        local execute, compileError = loadstring(source)
+
+        if not execute then
+            setStatus("Erreur de chargement du script.", false)
+            warn("[CloverHub] Loadstring error:", compileError)
+            return
+        end
+
+        ScreenGui:Destroy()
+
+        local success, runtimeError = pcall(function()
+            execute()
+        end)
+
+        if not success then
+            warn("[CloverHub] Script error:", runtimeError)
+        end
+    end
+
+    Button.MouseButton1Click:Connect(function()
         if checking then
             return
         end
 
-        local key = box.Text:gsub("%s+", "")
+        local key = Box.Text
 
-        if key == "" then
-            setStatus("Veuillez entrer une clé.", false)
+        if not key or key:gsub("%s+", "") == "" then
+            setStatus("Clé manquante.", false)
             return
         end
 
         checking = true
-        button.Text = "Vérification..."
-        setStatus("", false)
+        Button.Text = "Vérification..."
+        Button.Active = false
 
-        task.spawn(function()
-            local valid, reason = validateKey(key)
+        local valid, reason = validateKey(key)
 
-            if valid then
-                setStatus("Clé valide ! Chargement...", true)
+        if valid then
+            setStatus("Clé valide.", true)
 
-                task.wait(0.5)
+            task.wait(0.5)
 
-                gui:Destroy()
+            executeMainScript()
+        else
+            if reason == "invalid_key" then
+                setStatus("Clé invalide.", false)
 
-                onValid()
-                return
+            elseif reason == "missing_key" then
+                setStatus("Clé manquante.", false)
+
+            elseif reason == "hwid_mismatch" then
+                setStatus("Clé utilisée sur un autre appareil.", false)
+
+            elseif reason == "expired" then
+                setStatus("Clé expirée.", false)
+
+            elseif reason == "blacklisted" then
+                setStatus("Clé blacklistée.", false)
+
+            else
+                setStatus("Erreur serveur. Réessayez.", false)
             end
-
-            local messages = {
-                invalid_key = "Clé invalide.",
-                missing_key = "Clé manquante.",
-                hwid_mismatch = "Clé utilisée sur un autre appareil.",
-                expired = "Clé expirée.",
-                blacklisted = "Clé blacklistée.",
-                server_error = "Erreur serveur. Réessayez."
-            }
-
-            setStatus(
-                messages[reason] or "Clé invalide.",
-                false
-            )
-
-            button.Text = "Valider la clé"
-            checking = false
-        end)
-    end
-
-    button.MouseButton1Click:Connect(tryValidate)
-
-    box.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            tryValidate()
         end
+
+        checking = false
+        Button.Text = "Valider la clé"
+        Button.Active = true
+    end)
+
+    -- Touche Entrée pour valider
+    Box.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            Button:Activate()
+        end
+    end)
+
+    -- Focus automatique
+    task.defer(function()
+        task.wait(0.2)
+        Box:CaptureFocus()
     end)
 end
 
--- Lance le script uniquement après validation
-showKeyUI(function()
+-- =========================================================
+-- START
+-- =========================================================
 
-    local ok, err = pcall(function()
-        local source = game:HttpGet(MAIN_SCRIPT)
-
-        local execute = loadstring(source)
-
-        if not execute then
-            error("Impossible de charger le script.")
-        end
-
-        execute()
-    end)
-
-    if not ok then
-        warn("[CloverHub] Erreur : " .. tostring(err))
-    end
-end)
+createGui()
