@@ -3072,7 +3072,7 @@ SettingsTab:Section({ Title = "Window", Icon = "panel-top", Opened = true })
 
 SettingsTab:Button({
     Title = "Open Window",
-    Desc = "Open CRZHub immediately.",
+    Desc = "Open Nexus HUB immediately.",
     Icon = "panel-top-open",
     Callback = function()
         Window:Open()
@@ -3081,7 +3081,7 @@ SettingsTab:Button({
 
 SettingsTab:Button({
     Title = "Close Window",
-    Desc = "Close CRZHub UI.",
+    Desc = "Close Nexus HUB UI.",
     Icon = "x",
     Callback = function()
         Window:Close()
@@ -3090,7 +3090,7 @@ SettingsTab:Button({
 
 SettingsTab:Keybind({
     Title = "UI Keybind",
-    Desc = "Key to open/close the CRZHub UI.",
+    Desc = "Key to open/close the Nexus HUB UI.",
     Icon = "keyboard",
     Value = "K",
     CanChange = true,
@@ -3104,7 +3104,7 @@ SettingsTab:Section({ Title = "Community", Icon = "message-circle", Opened = tru
 
 SettingsTab:Button({
     Title = "Join Discord",
-    Desc = "Copy the CRZHub Discord invite link.",
+    Desc = "Copy the Nexus HUB Discord invite link.",
     Icon = "message-circle",
     Callback = function()
         local copied = copyDiscordLink()
