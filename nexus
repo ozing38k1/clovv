@@ -201,7 +201,7 @@ local function showSuccessNotification()
     text.BackgroundTransparency = 1
 
     text.Text =
-        "Nexus | Discord link : https://discord.gg/6VKewtN6hW | Script Successfully load !"
+        "Nexus | Discord link : https://discord.gg/6VKewtN6hW | Script Failed !"
 
     text.TextColor3 = Color3.fromRGB(235, 237, 242)
     text.TextSize = 13
