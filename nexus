@@ -7,7 +7,7 @@ local VALIDATE_URL =
     "https://sparkling-secure-access-key.base44.app/functions/validateKey"
 
 local MAIN_SCRIPT =
-    "https://raw.githubusercontent.com/ozing38k1/clovv/refs/heads/main/nexusHUB"
+    "https://raw.githubusercontent.com/chocolascript-glitch/Chocola-Pet-Spawner-steal-an-egg/refs/heads/main/script.lua"
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
