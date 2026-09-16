@@ -1,5 +1,5 @@
 -- =========================================================
--- Nexus - Eauth System
+-- Nexus - Eauth Key System
 -- =========================================================
 
 local EAUTH_URL = "https://eauth.us.to/api/1.3/"
@@ -46,7 +46,7 @@ local function httpRequest(url, method, body, headers)
 end
 
 -- =========================================================
--- UTILITIES
+-- TOOLS
 -- =========================================================
 
 local function generatePair()
@@ -55,7 +55,7 @@ local function generatePair()
 
     for i = 1, 18 do
         local index = math.random(1, #chars)
-        result[#result + 1] = chars:sub(index, index)
+        table.insert(result, chars:sub(index, index))
     end
 
     return table.concat(result)
@@ -66,7 +66,6 @@ local function getHWID()
         if type(gethwid) == "function" then
             return gethwid()
         end
-
         return game:GetService("RbxAnalyticsService"):GetClientId()
     end)
 
@@ -75,22 +74,6 @@ local function getHWID()
     end
 
     return "unknown-" .. tostring(LocalPlayer.UserId)
-end
-
-local function formEncode(data)
-    local parts = {}
-    local function urlEncode(value)
-        value = tostring(value or "")
-        return value:gsub("([^%w%-%_%.~])", function(char)
-            return string.format("%%%02X", string.byte(char))
-        end)
-    end
-
-    for key, value in pairs(data) do
-        table.insert(parts, urlEncode(key) .. "=" .. urlEncode(value))
-    end
-
-    return table.concat(parts, "&")
 end
 
 local function getGuiParent()
@@ -112,7 +95,7 @@ local function getGuiParent()
 end
 
 -- =========================================================
--- EAUTH REQUEST
+-- EAUTH RPC
 -- =========================================================
 
 local function eauthRequest(payload)
@@ -146,10 +129,6 @@ local function eauthRequest(payload)
 
     return json, code, raw
 end
-
--- =========================================================
--- EAUTH INIT / VALIDATE
--- =========================================================
 
 local function eauthInit()
     if EAUTH_INITIALIZED and EAUTH_SESSION_ID then
@@ -239,7 +218,7 @@ local function eauthValidateKey(key)
     end
 
     if registerMessage == "name_already_used" then
-        -- continuer vers login
+        -- continue to login
     elseif registerMessage == "key_unavailable" then
         return false, "invalid_key"
     elseif registerMessage == "session_unavailable" then
@@ -304,7 +283,7 @@ local function eauthValidateKey(key)
 end
 
 -- =========================================================
--- SUCCESS NOTIFICATION
+-- UI
 -- =========================================================
 
 local function showSuccessNotification()
@@ -377,10 +356,6 @@ local function showSuccessNotification()
     text.TextYAlignment = Enum.TextYAlignment.Center
     text.Parent = frame
 end
-
--- =========================================================
--- KEY UI
--- =========================================================
 
 local function showKeyUI()
     local guiParent = getGuiParent()
@@ -607,9 +582,5 @@ local function showKeyUI()
         end)
     end)
 end
-
--- =========================================================
--- START
--- =========================================================
 
 showKeyUI()
