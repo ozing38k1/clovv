@@ -1,13 +1,37 @@
 --[[
     Nexus — Key System
+    Eauth Authentication
     Script : Steal-An-Egg
 ]]
 
-local VALIDATE_URL =
-    "https://sparkling-secure-access-key.base44.app/functions/validateKey"
+-- =========================================================
+-- EAUTH CONFIGURATION
+-- =========================================================
+
+local EAUTH_URL =
+    "https://eauth.us.to/api/1.1/"
+
+-- Mets tes valeurs Eauth ici.
+-- Ne partage jamais ton App Secret publiquement.
+local EAUTH_APP_TOKEN =
+    "wERSgsUqoOQAVG7b2t"
+
+local EAUTH_APP_SECRET =
+    "ShGi1kHNqUg3X849eE"
+
+local EAUTH_VERSION =
+    "1.0"
+
+-- =========================================================
+-- MAIN SCRIPT
+-- =========================================================
 
 local MAIN_SCRIPT =
     "https://raw.githubusercontent.com/davizin713/ONhub/refs/heads/main/script.lua"
+
+-- =========================================================
+-- SERVICES
+-- =========================================================
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -17,7 +41,8 @@ local LocalPlayer = Players.LocalPlayer
 -- HTTP REQUEST
 -- =========================================================
 
-local function httpRequest(url, method, body)
+local function httpRequest(url, method, body, headers)
+
     local requestFn =
         request
         or http_request
@@ -25,25 +50,99 @@ local function httpRequest(url, method, body)
         or (fluxus and fluxus.request)
 
     if type(requestFn) ~= "function" then
-        return nil, 0
+        return nil, 0, "request_function_missing"
     end
 
     local ok, response = pcall(function()
+
         return requestFn({
             Url = url,
             Method = method,
-            Headers = {
-                ["Content-Type"] = "application/json"
+            Headers = headers or {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
             },
             Body = body
         })
+
     end)
 
     if not ok or not response then
-        return nil, 0
+        return nil, 0, "request_failed"
     end
 
-    return response.Body, response.StatusCode
+    return response.Body, response.StatusCode or 0, response
+end
+
+-- =========================================================
+-- URL ENCODE
+-- =========================================================
+
+local function urlEncode(value)
+
+    value = tostring(value or "")
+
+    return value:gsub("([^%w%-_%.~])", function(char)
+        return string.format("%%%02X", string.byte(char))
+    end)
+
+end
+
+-- =========================================================
+-- FORM ENCODE
+-- =========================================================
+
+local function formEncode(data)
+
+    local parts = {}
+
+    for key, value in pairs(data) do
+
+        table.insert(
+            parts,
+            urlEncode(key) .. "=" .. urlEncode(value)
+        )
+
+    end
+
+    return table.concat(parts, "&")
+
+end
+
+-- =========================================================
+-- GET GUI PARENT
+-- =========================================================
+
+local function getGuiParent()
+
+    local guiParent
+
+    if type(gethui) == "function" then
+
+        local ok, result = pcall(gethui)
+
+        if ok and result then
+            guiParent = result
+        end
+
+    end
+
+    if not guiParent then
+
+        local ok, result = pcall(function()
+            return game:GetService("CoreGui")
+        end)
+
+        if ok and result then
+            guiParent = result
+        end
+
+    end
+
+    if not guiParent then
+        guiParent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    return guiParent
 end
 
 -- =========================================================
@@ -51,12 +150,15 @@ end
 -- =========================================================
 
 local function getHWID()
+
     local ok, id = pcall(function()
+
         if type(gethwid) == "function" then
             return gethwid()
         end
 
         return game:GetService("RbxAnalyticsService"):GetClientId()
+
     end)
 
     if ok and id then
@@ -67,39 +169,359 @@ local function getHWID()
 end
 
 -- =========================================================
--- VALIDATION
+-- EAUTH STATE
 -- =========================================================
 
-local function validateKey(key)
-    local body = HttpService:JSONEncode({
-        key_code = tostring(key):gsub("%s+", ""):upper(),
-        hwid = getHWID(),
-        username = LocalPlayer.Name
-    })
+local EAUTH_SESSION_ID = nil
+local EAUTH_INITIALIZED = false
 
-    local raw, code = httpRequest(
-        VALIDATE_URL,
-        "POST",
-        body
-    )
+-- =========================================================
+-- EAUTH REQUEST
+-- =========================================================
 
-    if not raw or code ~= 200 then
-        return false, "server_error"
+local function eauthRequest(data)
+
+    local body = formEncode(data)
+
+    local raw, code, response =
+        httpRequest(
+            EAUTH_URL,
+            "POST",
+            body,
+            {
+                ["Content-Type"] =
+                    "application/x-www-form-urlencoded",
+
+                ["User-Agent"] =
+                    "e_a_u_t_h"
+            }
+        )
+
+    if not raw then
+        return nil, code, response
     end
 
-    local ok, data = pcall(function()
+    if code < 200 or code >= 300 then
+        return nil, code, raw
+    end
+
+    local ok, json = pcall(function()
         return HttpService:JSONDecode(raw)
     end)
 
-    if not ok or type(data) ~= "table" then
+    if not ok or type(json) ~= "table" then
+        return nil, code, raw
+    end
+
+    return json, code, raw
+end
+
+-- =========================================================
+-- EAUTH INITIALIZATION
+-- =========================================================
+
+local function eauthInit()
+
+    if EAUTH_INITIALIZED and EAUTH_SESSION_ID then
+        return true, "init_success"
+    end
+
+    local hwid = getHWID()
+
+    local data = {
+
+        sort = "init",
+
+        appkey =
+            EAUTH_APP_TOKEN,
+
+        acckey =
+            EAUTH_APP_SECRET,
+
+        hwid =
+            hwid,
+
+        version =
+            EAUTH_VERSION
+    }
+
+    local response, code =
+        eauthRequest(data)
+
+    if not response then
+
+        warn(
+            "[Nexus] Eauth init HTTP error: "
+            .. tostring(code)
+        )
+
         return false, "server_error"
     end
 
-    if data.valid == true then
+    local message =
+        tostring(response.message or "")
+
+    if message == "init_success" then
+
+        EAUTH_SESSION_ID =
+            response.session_id
+
+        if not EAUTH_SESSION_ID then
+
+            return false, "server_error"
+        end
+
+        EAUTH_INITIALIZED = true
+
+        return true, "init_success"
+    end
+
+    if message == "invalid_account_key" then
+        return false, "invalid_account_key"
+    end
+
+    if message == "invalid_application_key" then
+        return false, "invalid_application_key"
+    end
+
+    if message == "invalid_request" then
+        return false, "invalid_request"
+    end
+
+    if message == "version_outdated" then
+        return false, "version_outdated"
+    end
+
+    if message == "maximum_sessions_reached" then
+        return false, "maximum_sessions_reached"
+    end
+
+    if message == "init_paused" then
+        return false, "init_paused"
+    end
+
+    if message == "user_is_banned" then
+        return false, "user_is_banned"
+    end
+
+    return false, message ~= "" and message or "server_error"
+end
+
+-- =========================================================
+-- EAUTH KEY LOGIN
+-- =========================================================
+
+local function eauthValidateKey(key)
+
+    key =
+        tostring(key)
+        :gsub("%s+", "")
+        :upper()
+
+    if key == "" then
+        return false, "missing_key"
+    end
+
+    -- -----------------------------------------------------
+    -- INITIALIZE EAUTH
+    -- -----------------------------------------------------
+
+    local initialized, initReason =
+        eauthInit()
+
+    if not initialized then
+        return false, initReason
+    end
+
+    local hwid = getHWID()
+
+    -- -----------------------------------------------------
+    -- KEY-ONLY ACCOUNT
+    --
+    -- Eauth's public SDK handles a key-only login by using
+    -- the key as username/password and registering it first.
+    -- -----------------------------------------------------
+
+    local registerData = {
+
+        sort = "register",
+
+        sessionid =
+            EAUTH_SESSION_ID,
+
+        username =
+            key,
+
+        password =
+            key,
+
+        key =
+            key,
+
+        hwid =
+            hwid
+    }
+
+    local registerResponse, registerCode =
+        eauthRequest(registerData)
+
+    if not registerResponse then
+
+        warn(
+            "[Nexus] Eauth register HTTP error: "
+            .. tostring(registerCode)
+        )
+
+        return false, "server_error"
+    end
+
+    local registerMessage =
+        tostring(registerResponse.message or "")
+
+    -- -----------------------------------------------------
+    -- NEW KEY
+    -- -----------------------------------------------------
+
+    if registerMessage == "register_success" then
+
         return true, "valid"
     end
 
-    return false, data.reason or "invalid_key"
+    -- -----------------------------------------------------
+    -- KEY ALREADY EXISTS
+    --
+    -- Continue with login.
+    -- -----------------------------------------------------
+
+    if registerMessage == "name_already_used" then
+
+        -- Continue below to login.
+    elseif registerMessage == "key_unavailable" then
+
+        return false, "invalid_key"
+
+    elseif registerMessage == "session_unavailable" then
+
+        return false, "session_unavailable"
+
+    elseif registerMessage == "session_already_used" then
+
+        return false, "session_already_used"
+
+    elseif registerMessage == "session_overcrowded" then
+
+        return false, "maximum_sessions_reached"
+
+    elseif registerMessage == "session_expired" then
+
+        return false, "session_expired"
+
+    elseif registerMessage == "invalid_account_key" then
+
+        return false, "invalid_account_key"
+
+    elseif registerMessage == "maximum_users_reached" then
+
+        return false, "maximum_users_reached"
+
+    elseif registerMessage == "user_is_banned" then
+
+        return false, "blacklisted"
+
+    elseif registerMessage ~= "" then
+
+        return false, registerMessage
+    end
+
+    -- -----------------------------------------------------
+    -- LOGIN
+    -- -----------------------------------------------------
+
+    local loginData = {
+
+        sort = "login",
+
+        sessionid =
+            EAUTH_SESSION_ID,
+
+        username =
+            key,
+
+        password =
+            key,
+
+        hwid =
+            hwid
+    }
+
+    local loginResponse, loginCode =
+        eauthRequest(loginData)
+
+    if not loginResponse then
+
+        warn(
+            "[Nexus] Eauth login HTTP error: "
+            .. tostring(loginCode)
+        )
+
+        return false, "server_error"
+    end
+
+    local loginMessage =
+        tostring(loginResponse.message or "")
+
+    -- -----------------------------------------------------
+    -- SUCCESS
+    -- -----------------------------------------------------
+
+    if loginMessage == "login_success" then
+        return true, "valid"
+    end
+
+    -- -----------------------------------------------------
+    -- ERRORS
+    -- -----------------------------------------------------
+
+    if loginMessage == "account_unavailable" then
+        return false, "invalid_key"
+    end
+
+    if loginMessage == "hwid_incorrect" then
+        return false, "hwid_mismatch"
+    end
+
+    if loginMessage == "subscription_expired" then
+        return false, "expired"
+    end
+
+    if loginMessage == "user_is_banned" then
+        return false, "blacklisted"
+    end
+
+    if loginMessage == "session_unavailable" then
+        return false, "session_unavailable"
+    end
+
+    if loginMessage == "session_already_used" then
+        return false, "session_already_used"
+    end
+
+    if loginMessage == "session_overcrowded" then
+        return false, "maximum_sessions_reached"
+    end
+
+    if loginMessage == "session_expired" then
+        return false, "session_expired"
+    end
+
+    if loginMessage == "invalid_request" then
+        return false, "invalid_request"
+    end
+
+    return false,
+        loginMessage ~= ""
+        and loginMessage
+        or "invalid_key"
 end
 
 -- =========================================================
@@ -108,107 +530,267 @@ end
 
 local function showSuccessNotification()
 
-    local guiParent
-
-    if type(gethui) == "function" then
-        local ok, result = pcall(gethui)
-
-        if ok and result then
-            guiParent = result
-        end
-    end
-
-    if not guiParent then
-        local ok, result = pcall(function()
-            return game:GetService("CoreGui")
-        end)
-
-        if ok and result then
-            guiParent = result
-        end
-    end
-
-    if not guiParent then
-        guiParent = LocalPlayer:WaitForChild("PlayerGui")
-    end
+    local guiParent =
+        getGuiParent()
 
     pcall(function()
-        local old = guiParent:FindFirstChild("NexusSuccessNotification")
+
+        local old =
+            guiParent:FindFirstChild(
+                "NexusSuccessNotification"
+            )
 
         if old then
             old:Destroy()
         end
+
     end)
 
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "NexusSuccessNotification"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = guiParent
+    local gui =
+        Instance.new("ScreenGui")
 
-    -- Barre principale
-    local frame = Instance.new("Frame")
-    frame.Name = "Notification"
+    gui.Name =
+        "NexusSuccessNotification"
 
-    -- TOUT EN HAUT + CENTRÉ
-    frame.AnchorPoint = Vector2.new(0.5, 0)
-    frame.Position = UDim2.new(0.5, 0, 0, 0)
+    gui.ResetOnSpawn =
+        false
 
-    frame.Size = UDim2.new(0, 700, 0, 44)
-    frame.BackgroundColor3 = Color3.fromRGB(16, 17, 21)
-    frame.BorderSizePixel = 0
-    frame.Parent = gui
+    gui.IgnoreGuiInset =
+        true
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 0)
-    corner.Parent = frame
+    gui.ZIndexBehavior =
+        Enum.ZIndexBehavior.Sibling
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(55, 58, 68)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.15
-    stroke.Parent = frame
+    gui.Parent =
+        guiParent
 
-    -- Ligne verte
-    local topLine = Instance.new("Frame")
-    topLine.Name = "TopLine"
-    topLine.Position = UDim2.new(0, 0, 0, 0)
-    topLine.Size = UDim2.new(1, 0, 0, 2)
-    topLine.BackgroundColor3 = Color3.fromRGB(80, 220, 140)
-    topLine.BorderSizePixel = 0
-    topLine.Parent = frame
+    -- -----------------------------------------------------
+    -- BAR
+    -- -----------------------------------------------------
 
-    -- Point de statut
-    local dot = Instance.new("Frame")
-    dot.Name = "StatusDot"
-    dot.AnchorPoint = Vector2.new(0, 0.5)
-    dot.Position = UDim2.new(0, 14, 0.5, 0)
-    dot.Size = UDim2.new(0, 8, 0, 8)
-    dot.BackgroundColor3 = Color3.fromRGB(80, 220, 140)
-    dot.BorderSizePixel = 0
-    dot.Parent = frame
+    local frame =
+        Instance.new("Frame")
 
-    local dotCorner = Instance.new("UICorner")
-    dotCorner.CornerRadius = UDim.new(1, 0)
-    dotCorner.Parent = dot
+    frame.Name =
+        "Notification"
 
-    -- Texte
-    local text = Instance.new("TextLabel")
-    text.Name = "Message"
-    text.Position = UDim2.new(0, 30, 0, 0)
-    text.Size = UDim2.new(1, -45, 1, 0)
-    text.BackgroundTransparency = 1
+    frame.AnchorPoint =
+        Vector2.new(0.5, 0)
+
+    frame.Position =
+        UDim2.new(
+            0.5,
+            0,
+            0,
+            0
+        )
+
+    frame.Size =
+        UDim2.new(
+            0,
+            700,
+            0,
+            44
+        )
+
+    frame.BackgroundColor3 =
+        Color3.fromRGB(
+            16,
+            17,
+            21
+        )
+
+    frame.BorderSizePixel =
+        0
+
+    frame.Parent =
+        gui
+
+    -- -----------------------------------------------------
+    -- CORNER
+    -- -----------------------------------------------------
+
+    local corner =
+        Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(0, 0)
+
+    corner.Parent =
+        frame
+
+    -- -----------------------------------------------------
+    -- STROKE
+    -- -----------------------------------------------------
+
+    local stroke =
+        Instance.new("UIStroke")
+
+    stroke.Color =
+        Color3.fromRGB(
+            55,
+            58,
+            68
+        )
+
+    stroke.Thickness =
+        1
+
+    stroke.Transparency =
+        0.15
+
+    stroke.Parent =
+        frame
+
+    -- -----------------------------------------------------
+    -- GREEN LINE
+    -- -----------------------------------------------------
+
+    local topLine =
+        Instance.new("Frame")
+
+    topLine.Name =
+        "TopLine"
+
+    topLine.Position =
+        UDim2.new(
+            0,
+            0,
+            0,
+            0
+        )
+
+    topLine.Size =
+        UDim2.new(
+            1,
+            0,
+            0,
+            2
+        )
+
+    topLine.BackgroundColor3 =
+        Color3.fromRGB(
+            80,
+            220,
+            140
+        )
+
+    topLine.BorderSizePixel =
+        0
+
+    topLine.Parent =
+        frame
+
+    -- -----------------------------------------------------
+    -- STATUS DOT
+    -- -----------------------------------------------------
+
+    local dot =
+        Instance.new("Frame")
+
+    dot.Name =
+        "StatusDot"
+
+    dot.AnchorPoint =
+        Vector2.new(
+            0,
+            0.5
+        )
+
+    dot.Position =
+        UDim2.new(
+            0,
+            14,
+            0.5,
+            0
+        )
+
+    dot.Size =
+        UDim2.new(
+            0,
+            8,
+            0,
+            8
+        )
+
+    dot.BackgroundColor3 =
+        Color3.fromRGB(
+            80,
+            220,
+            140
+        )
+
+    dot.BorderSizePixel =
+        0
+
+    dot.Parent =
+        frame
+
+    local dotCorner =
+        Instance.new("UICorner")
+
+    dotCorner.CornerRadius =
+        UDim.new(
+            1,
+            0
+        )
+
+    dotCorner.Parent =
+        dot
+
+    -- -----------------------------------------------------
+    -- TEXT
+    -- -----------------------------------------------------
+
+    local text =
+        Instance.new("TextLabel")
+
+    text.Name =
+        "Message"
+
+    text.Position =
+        UDim2.new(
+            0,
+            30,
+            0,
+            0
+        )
+
+    text.Size =
+        UDim2.new(
+            1,
+            -45,
+            1,
+            0
+        )
+
+    text.BackgroundTransparency =
+        1
 
     text.Text =
-        "Nexus | Discord link : https://discord.gg/6VKewtN6hW | Script Failed !"
+        "Nexus | Discord link : https://discord.gg/6VKewtN6hW | Script Successfully load !"
 
-    text.TextColor3 = Color3.fromRGB(235, 237, 242)
-    text.TextSize = 13
-    text.Font = Enum.Font.GothamMedium
-    text.TextXAlignment = Enum.TextXAlignment.Center
-    text.TextYAlignment = Enum.TextYAlignment.Center
-    text.Parent = frame
+    text.TextColor3 =
+        Color3.fromRGB(
+            235,
+            237,
+            242
+        )
+
+    text.TextSize =
+        13
+
+    text.Font =
+        Enum.Font.GothamMedium
+
+    text.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    text.TextYAlignment =
+        Enum.TextYAlignment.Center
+
+    text.Parent =
+        frame
 end
 
 -- =========================================================
@@ -217,191 +799,582 @@ end
 
 local function showKeyUI()
 
-    local guiParent
-
-    if type(gethui) == "function" then
-        local ok, result = pcall(gethui)
-
-        if ok and result then
-            guiParent = result
-        end
-    end
-
-    if not guiParent then
-        local ok, result = pcall(function()
-            return game:GetService("CoreGui")
-        end)
-
-        if ok and result then
-            guiParent = result
-        end
-    end
-
-    if not guiParent then
-        guiParent = LocalPlayer:WaitForChild("PlayerGui")
-    end
+    local guiParent =
+        getGuiParent()
 
     pcall(function()
-        local old = guiParent:FindFirstChild("NexusKeySystem")
+
+        local old =
+            guiParent:FindFirstChild(
+                "NexusKeySystem"
+            )
 
         if old then
             old:Destroy()
         end
+
     end)
 
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "NexusKeySystem"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = guiParent
+    local gui =
+        Instance.new("ScreenGui")
 
-    -- Background
-    local background = Instance.new("Frame")
-    background.Size = UDim2.fromScale(1, 1)
-    background.BackgroundColor3 = Color3.fromRGB(7, 8, 11)
-    background.BackgroundTransparency = 0.12
-    background.BorderSizePixel = 0
-    background.Parent = gui
+    gui.Name =
+        "NexusKeySystem"
 
-    -- Card
-    local card = Instance.new("Frame")
-    card.AnchorPoint = Vector2.new(0.5, 0.5)
-    card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(400, 290)
-    card.BackgroundColor3 = Color3.fromRGB(18, 19, 24)
-    card.BorderSizePixel = 0
-    card.Parent = background
+    gui.ResetOnSpawn =
+        false
 
-    local cardCorner = Instance.new("UICorner")
-    cardCorner.CornerRadius = UDim.new(0, 14)
-    cardCorner.Parent = card
+    gui.IgnoreGuiInset =
+        true
 
-    local cardStroke = Instance.new("UIStroke")
-    cardStroke.Color = Color3.fromRGB(48, 51, 60)
-    cardStroke.Thickness = 1
-    cardStroke.Parent = card
+    gui.ZIndexBehavior =
+        Enum.ZIndexBehavior.Sibling
 
-    -- Title
-    local title = Instance.new("TextLabel")
-    title.BackgroundTransparency = 1
-    title.Position = UDim2.fromOffset(20, 22)
-    title.Size = UDim2.new(1, -40, 0, 35)
-    title.Font = Enum.Font.GothamBold
-    title.Text = "Nexus"
-    title.TextSize = 25
-    title.TextColor3 = Color3.fromRGB(240, 242, 246)
-    title.TextXAlignment = Enum.TextXAlignment.Center
-    title.Parent = card
+    gui.Parent =
+        guiParent
 
-    -- Description
-    local description = Instance.new("TextLabel")
-    description.BackgroundTransparency = 1
-    description.Position = UDim2.fromOffset(25, 58)
-    description.Size = UDim2.new(1, -50, 0, 32)
-    description.Font = Enum.Font.Gotham
-    description.Text = "Enter your key to continue"
-    description.TextSize = 13
-    description.TextColor3 = Color3.fromRGB(140, 145, 155)
-    description.TextXAlignment = Enum.TextXAlignment.Center
-    description.Parent = card
+    -- =====================================================
+    -- BACKGROUND
+    -- =====================================================
 
-    -- Key Box
-    local box = Instance.new("TextBox")
-    box.Name = "KeyInput"
-    box.Position = UDim2.fromOffset(30, 100)
-    box.Size = UDim2.new(1, -60, 0, 48)
-    box.BackgroundColor3 = Color3.fromRGB(28, 30, 36)
-    box.BorderSizePixel = 0
-    box.Text = ""
-    box.PlaceholderText = "CLVR-XXXXX-XXXXX-XXXXX"
-    box.PlaceholderColor3 = Color3.fromRGB(90, 95, 105)
-    box.TextColor3 = Color3.fromRGB(235, 237, 242)
-    box.TextSize = 14
-    box.Font = Enum.Font.Gotham
-    box.ClearTextOnFocus = false
-    box.MultiLine = false
-    box.TextXAlignment = Enum.TextXAlignment.Center
-    box.TextYAlignment = Enum.TextYAlignment.Center
-    box.Parent = card
+    local background =
+        Instance.new("Frame")
 
-    local boxCorner = Instance.new("UICorner")
-    boxCorner.CornerRadius = UDim.new(0, 8)
-    boxCorner.Parent = box
+    background.Size =
+        UDim2.fromScale(
+            1,
+            1
+        )
 
-    local boxStroke = Instance.new("UIStroke")
-    boxStroke.Color = Color3.fromRGB(50, 53, 62)
-    boxStroke.Thickness = 1
-    boxStroke.Parent = box
+    background.BackgroundColor3 =
+        Color3.fromRGB(
+            7,
+            8,
+            11
+        )
 
-    -- Status
-    local status = Instance.new("TextLabel")
-    status.BackgroundTransparency = 1
-    status.Position = UDim2.fromOffset(25, 153)
-    status.Size = UDim2.new(1, -50, 0, 25)
-    status.Font = Enum.Font.Gotham
-    status.TextSize = 12
-    status.Text = ""
-    status.TextXAlignment = Enum.TextXAlignment.Center
-    status.Parent = card
+    background.BackgroundTransparency =
+        0.12
 
-    -- Button
-    local button = Instance.new("TextButton")
-    button.Position = UDim2.fromOffset(30, 193)
-    button.Size = UDim2.new(1, -60, 0, 45)
-    button.BackgroundColor3 = Color3.fromRGB(42, 45, 53)
-    button.BorderSizePixel = 0
-    button.Text = "Validate Key"
-    button.TextColor3 = Color3.fromRGB(240, 242, 246)
-    button.TextSize = 14
-    button.Font = Enum.Font.GothamBold
-    button.Parent = card
+    background.BorderSizePixel =
+        0
 
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 8)
-    buttonCorner.Parent = button
+    background.Parent =
+        gui
 
-    local checking = false
+    -- =====================================================
+    -- CARD
+    -- =====================================================
 
-    -- Status
-    local function setStatus(message, success)
-        status.Text = message
+    local card =
+        Instance.new("Frame")
+
+    card.AnchorPoint =
+        Vector2.new(
+            0.5,
+            0.5
+        )
+
+    card.Position =
+        UDim2.fromScale(
+            0.5,
+            0.5
+        )
+
+    card.Size =
+        UDim2.fromOffset(
+            400,
+            290
+        )
+
+    card.BackgroundColor3 =
+        Color3.fromRGB(
+            18,
+            19,
+            24
+        )
+
+    card.BorderSizePixel =
+        0
+
+    card.Parent =
+        background
+
+    local cardCorner =
+        Instance.new("UICorner")
+
+    cardCorner.CornerRadius =
+        UDim.new(
+            0,
+            14
+        )
+
+    cardCorner.Parent =
+        card
+
+    local cardStroke =
+        Instance.new("UIStroke")
+
+    cardStroke.Color =
+        Color3.fromRGB(
+            48,
+            51,
+            60
+        )
+
+    cardStroke.Thickness =
+        1
+
+    cardStroke.Parent =
+        card
+
+    -- =====================================================
+    -- TITLE
+    -- =====================================================
+
+    local title =
+        Instance.new("TextLabel")
+
+    title.BackgroundTransparency =
+        1
+
+    title.Position =
+        UDim2.fromOffset(
+            20,
+            22
+        )
+
+    title.Size =
+        UDim2.new(
+            1,
+            -40,
+            0,
+            35
+        )
+
+    title.Font =
+        Enum.Font.GothamBold
+
+    title.Text =
+        "Nexus"
+
+    title.TextSize =
+        25
+
+    title.TextColor3 =
+        Color3.fromRGB(
+            240,
+            242,
+            246
+        )
+
+    title.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    title.Parent =
+        card
+
+    -- =====================================================
+    -- DESCRIPTION
+    -- =====================================================
+
+    local description =
+        Instance.new("TextLabel")
+
+    description.BackgroundTransparency =
+        1
+
+    description.Position =
+        UDim2.fromOffset(
+            25,
+            58
+        )
+
+    description.Size =
+        UDim2.new(
+            1,
+            -50,
+            0,
+            32
+        )
+
+    description.Font =
+        Enum.Font.Gotham
+
+    description.Text =
+        "Enter your key to continue"
+
+    description.TextSize =
+        13
+
+    description.TextColor3 =
+        Color3.fromRGB(
+            140,
+            145,
+            155
+        )
+
+    description.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    description.Parent =
+        card
+
+    -- =====================================================
+    -- KEY BOX
+    -- =====================================================
+
+    local box =
+        Instance.new("TextBox")
+
+    box.Name =
+        "KeyInput"
+
+    box.Position =
+        UDim2.fromOffset(
+            30,
+            100
+        )
+
+    box.Size =
+        UDim2.new(
+            1,
+            -60,
+            0,
+            48
+        )
+
+    box.BackgroundColor3 =
+        Color3.fromRGB(
+            28,
+            30,
+            36
+        )
+
+    box.BorderSizePixel =
+        0
+
+    box.Text =
+        ""
+
+    box.PlaceholderText =
+        "Enter Eauth Key"
+
+    box.PlaceholderColor3 =
+        Color3.fromRGB(
+            90,
+            95,
+            105
+        )
+
+    box.TextColor3 =
+        Color3.fromRGB(
+            235,
+            237,
+            242
+        )
+
+    box.TextSize =
+        14
+
+    box.Font =
+        Enum.Font.Gotham
+
+    box.ClearTextOnFocus =
+        false
+
+    box.MultiLine =
+        false
+
+    box.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    box.TextYAlignment =
+        Enum.TextYAlignment.Center
+
+    box.Parent =
+        card
+
+    local boxCorner =
+        Instance.new("UICorner")
+
+    boxCorner.CornerRadius =
+        UDim.new(
+            0,
+            8
+        )
+
+    boxCorner.Parent =
+        box
+
+    local boxStroke =
+        Instance.new("UIStroke")
+
+    boxStroke.Color =
+        Color3.fromRGB(
+            50,
+            53,
+            62
+        )
+
+    boxStroke.Thickness =
+        1
+
+    boxStroke.Parent =
+        box
+
+    -- =====================================================
+    -- STATUS
+    -- =====================================================
+
+    local status =
+        Instance.new("TextLabel")
+
+    status.BackgroundTransparency =
+        1
+
+    status.Position =
+        UDim2.fromOffset(
+            25,
+            153
+        )
+
+    status.Size =
+        UDim2.new(
+            1,
+            -50,
+            0,
+            25
+        )
+
+    status.Font =
+        Enum.Font.Gotham
+
+    status.TextSize =
+        12
+
+    status.Text =
+        ""
+
+    status.TextXAlignment =
+        Enum.TextXAlignment.Center
+
+    status.Parent =
+        card
+
+    -- =====================================================
+    -- BUTTON
+    -- =====================================================
+
+    local button =
+        Instance.new("TextButton")
+
+    button.Position =
+        UDim2.fromOffset(
+            30,
+            193
+        )
+
+    button.Size =
+        UDim2.new(
+            1,
+            -60,
+            0,
+            45
+        )
+
+    button.BackgroundColor3 =
+        Color3.fromRGB(
+            42,
+            45,
+            53
+        )
+
+    button.BorderSizePixel =
+        0
+
+    button.Text =
+        "Validate Key"
+
+    button.TextColor3 =
+        Color3.fromRGB(
+            240,
+            242,
+            246
+        )
+
+    button.TextSize =
+        14
+
+    button.Font =
+        Enum.Font.GothamBold
+
+    button.Parent =
+        card
+
+    local buttonCorner =
+        Instance.new("UICorner")
+
+    buttonCorner.CornerRadius =
+        UDim.new(
+            0,
+            8
+        )
+
+    buttonCorner.Parent =
+        button
+
+    local checking =
+        false
+
+    -- =====================================================
+    -- STATUS FUNCTION
+    -- =====================================================
+
+    local function setStatus(
+        message,
+        success
+    )
+
+        status.Text =
+            message
 
         if success then
-            status.TextColor3 = Color3.fromRGB(95, 215, 140)
+
+            status.TextColor3 =
+                Color3.fromRGB(
+                    95,
+                    215,
+                    140
+                )
+
         else
-            status.TextColor3 = Color3.fromRGB(225, 105, 115)
+
+            status.TextColor3 =
+                Color3.fromRGB(
+                    225,
+                    105,
+                    115
+                )
+
         end
+
     end
 
     -- =====================================================
-    -- LOAD SCRIPT
+    -- LOAD MAIN SCRIPT
     -- =====================================================
 
     local function loadMainScript()
 
-        local ok, err = pcall(function()
+        local ok, err =
+            pcall(function()
 
-            local source = game:HttpGet(MAIN_SCRIPT)
+                local source =
+                    game:HttpGet(
+                        MAIN_SCRIPT
+                    )
 
-            local fn, loadError = loadstring(source)
+                local fn,
+                    loadError =
+                    loadstring(source)
 
-            if not fn then
-                error(loadError or "Unable to load script.")
-            end
+                if not fn then
 
-            fn()
-        end)
+                    error(
+                        loadError
+                        or "Unable to load script."
+                    )
+
+                end
+
+                fn()
+
+            end)
 
         if not ok then
-            warn("[Nexus] Script loading error: " .. tostring(err))
-            return
+
+            warn(
+                "[Nexus] Script loading error: "
+                .. tostring(err)
+            )
+
+            return false
         end
 
         task.wait(0.2)
 
         showSuccessNotification()
+
+        return true
     end
+
+    -- =====================================================
+    -- ERROR MESSAGES
+    -- =====================================================
+
+    local messages = {
+
+        invalid_key =
+            "Clé invalide.",
+
+        missing_key =
+            "Clé manquante.",
+
+        hwid_mismatch =
+            "HWID does not match.",
+
+        expired =
+            "Clé expirée.",
+
+        blacklisted =
+            "Clé blacklistée.",
+
+        server_error =
+            "Erreur serveur. Réessayez.",
+
+        invalid_account_key =
+            "Configuration Eauth invalide.",
+
+        invalid_application_key =
+            "App Token invalide.",
+
+        invalid_request =
+            "Requête Eauth invalide.",
+
+        version_outdated =
+            "Version Eauth obsolète.",
+
+        maximum_sessions_reached =
+            "Trop de sessions actives.",
+
+        session_unavailable =
+            "Session Eauth indisponible.",
+
+        session_already_used =
+            "Session déjà utilisée.",
+
+        session_overcrowded =
+            "Session saturée.",
+
+        session_expired =
+            "Session expirée.",
+
+        maximum_users_reached =
+            "Limite utilisateurs Eauth atteinte.",
+
+        invalid_email =
+            "Email invalide.",
+
+        init_paused =
+            "Application Eauth temporairement désactivée.",
+
+        user_is_banned =
+            "Accès refusé.",
+
+        account_unavailable =
+            "Clé invalide ou compte indisponible."
+    }
 
     -- =====================================================
     -- VALIDATE KEY
@@ -413,73 +1386,124 @@ local function showKeyUI()
             return
         end
 
-        local key = box.Text:gsub("%s+", "")
+        local key =
+            box.Text:gsub(
+                "%s+",
+                ""
+            )
 
         if key == "" then
-            setStatus("Clé manquante.", false)
+
+            setStatus(
+                "Clé manquante.",
+                false
+            )
+
             return
         end
 
-        checking = true
-        button.Active = false
-        button.Text = "Checking..."
+        checking =
+            true
 
-        setStatus("Vérification de la clé...", true)
+        button.Active =
+            false
+
+        button.Text =
+            "Checking..."
+
+        setStatus(
+            "Connexion à Eauth...",
+            true
+        )
 
         task.spawn(function()
 
-            local valid, reason = validateKey(key)
+            local valid,
+                reason =
+                eauthValidateKey(
+                    key
+                )
 
             if valid then
 
-                setStatus("Clé valide !", true)
+                setStatus(
+                    "Clé valide !",
+                    true
+                )
 
                 task.wait(0.4)
 
                 gui:Destroy()
 
-                loadMainScript()
+                local loaded =
+                    loadMainScript()
+
+                if not loaded then
+
+                    showKeyUI()
+
+                end
 
                 return
             end
 
-            local messages = {
-                invalid_key = "Clé invalide.",
-                missing_key = "Clé manquante.",
-                hwid_mismatch = "HWID does not match.",
-                expired = "Clé expirée.",
-                blacklisted = "Clé blacklistée.",
-                server_error = "Erreur serveur. Réessayez."
-            }
-
             setStatus(
-                messages[reason] or "Clé invalide.",
+                messages[reason]
+                or "Clé invalide.",
                 false
             )
 
-            checking = false
-            button.Active = true
-            button.Text = "Validate Key"
+            checking =
+                false
+
+            button.Active =
+                true
+
+            button.Text =
+                "Validate Key"
+
         end)
+
     end
 
-    button.MouseButton1Click:Connect(tryValidate)
+    -- =====================================================
+    -- BUTTON EVENT
+    -- =====================================================
 
-    box.FocusLost:Connect(function(enterPressed)
+    button.MouseButton1Click:Connect(
+        tryValidate
+    )
 
-        if enterPressed then
-            tryValidate()
+    -- =====================================================
+    -- ENTER EVENT
+    -- =====================================================
+
+    box.FocusLost:Connect(
+        function(enterPressed)
+
+            if enterPressed then
+                tryValidate()
+            end
+
         end
-    end)
+    )
+
+    -- =====================================================
+    -- AUTO FOCUS
+    -- =====================================================
 
     task.defer(function()
 
         task.wait(0.25)
 
         pcall(function()
+
             box:CaptureFocus()
+
         end)
+
     end)
+
 end
 
 -- =========================================================
