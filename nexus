@@ -9,7 +9,7 @@
 -- =========================================================
 
 local EAUTH_URL =
-    "https://eauth.us.to/api/1.1/"
+    "https://eauth.us.to/api/2.5/"
 
 -- Mets tes valeurs Eauth ici.
 -- Ne partage jamais ton App Secret publiquement.
